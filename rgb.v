@@ -1,13 +1,13 @@
 module top(
+  input CLKIN,
   output RGB0, RGB1, RGB2
 );
 
 wire clk;
 
-SB_HFOSC inthosc (
-  .CLKHFPU(1'b1),
-  .CLKHFEN(1'b1),
-  .CLKHF(clk)
+pll pll(
+  .clock_in(CLKIN),
+  .clock_out(clk)
 );
 
 localparam  counter_width = 32;

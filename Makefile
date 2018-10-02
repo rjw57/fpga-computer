@@ -8,10 +8,12 @@ ICEPACK = icepack
 ICETIME = icetime
 ICEPROG = iceprog
 
+SOURCES = rgb.v pll.v
+
 all: $(PROJ).bin
 
-%.blif: %.v
-	yosys -p 'synth_ice40 -top top -blif $@' $<
+%.blif: $(SOURCES)
+	yosys -p 'synth_ice40 -top top -blif $@' $(SOURCES)
 
 %.asc: $(PIN_DEF) %.blif
 	$(ARACHNE) $(ARACHNE_ARGS) -d $(subst up,,$(subst hx,,$(subst lp,,$(DEVICE)))) -o $@ -p $^
