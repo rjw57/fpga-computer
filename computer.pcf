@@ -1,5 +1,5 @@
 # Clock input
-set_io CLKIN 12
+set_io CLOCK_12M 12
 
 set_io RGB0 39
 set_io RGB1 40

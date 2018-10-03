@@ -1,19 +1,28 @@
-PROJ = rgb
-PIN_DEF = rgb.pcf
+PROJ = computer
+PIN_DEF = computer.pcf
 DEVICE = up5k
 
-ARACHNE = arachne-pnr 
-ARACHNE_ARGS = 
+ARACHNE = arachne-pnr
+ARACHNE_ARGS =
 ICEPACK = icepack
 ICETIME = icetime
 ICEPROG = iceprog
 
-SOURCES = rgb.v pll.v
+CPU_SOURCES = cpu/ALU.v cpu/cpu_65c02.v
+
+SOURCES = \
+	$(CPU_SOURCES) \
+	reset_timer.v \
+	top.v
+
+HW_EXTRA_SOURCES = hw/pll.v hw/led.v
+
+SIM_EXTRA_SOURCES = sim/pll.v sim/led.v
 
 all: $(PROJ).bin
 
-%.blif: $(SOURCES)
-	yosys -p 'synth_ice40 -top top -blif $@' $(SOURCES)
+%.blif: $(SOURCES) $(HW_EXTRA_SOURCES)
+	yosys -p 'synth_ice40 -top top -blif $@' $^
 
 %.asc: $(PIN_DEF) %.blif
 	$(ARACHNE) $(ARACHNE_ARGS) -d $(subst up,,$(subst hx,,$(subst lp,,$(DEVICE)))) -o $@ -p $^
@@ -23,6 +32,21 @@ all: $(PROJ).bin
 
 %.rpt: %.asc
 	$(ICETIME) -d $(DEVICE) -mtr $@ $<
+
+%_tb.out: %_tb.v $(SOURCES) $(SIM_EXTRA_SOURCES)
+	iverilog -o $@ $^
+
+%_tb.vcd: %_tb.out
+	vvp -N $< +vcd=$@
+
+%_syn.v: %.blif
+	yosys -p 'read_blif -wideports $^; write_verilog $@'
+
+%_syntb: %_tb.v %_syn.v $(SIM_EXTRA_SOURCES)
+	iverilog -o $@ $^ `yosys-config --datdir/ice40/cells_sim.v`
+
+%_syntb.vcd: %_syntb
+	vvp -N $< +vcd=$@
 
 prog: $(PROJ).bin
 	$(ICEPROG) $<

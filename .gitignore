@@ -1,3 +1,6 @@
 *.asc
 *.bin
 *.blif
+*.gtkw
+*.vcd
+*_tb.out
