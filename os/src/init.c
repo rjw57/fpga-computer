@@ -14,6 +14,8 @@ void init(void);
 // Idle loop routine. Called repeatedly until the end of time.
 void idle(void);
 
+#define IO_PORT (*((u8*)0x8400))
+
 void init(void) {
     // enable interrupts
     IRQ_ENABLE();
@@ -24,7 +26,5 @@ void init(void) {
 
 static u8 ctr = 0;
 void idle(void) {
-    u16 i;
-    for(i=0; i<0x1000; ++i) { }
-    *((u8*)(0x0400)) = ++ctr;
+    IO_PORT = ++ctr;
 }

@@ -75,6 +75,7 @@ bootrom bootrom(
   .data(bootrom_data_out)
 );
 
+// Synchronous RAM. Data available clock tick *after* address is valid.
 wire [7:0] ram_data_out;
 ram ram(
   .clk(cpu_clk),
@@ -87,7 +88,7 @@ ram ram(
 reg [7:0] io_port = 0;
 always @(posedge cpu_clk)
 begin
-  if((addr == 16'h0400) && cpu_writing)
+  if((addr == 16'h8400) && cpu_writing)
     io_port <= cpu_data_out;
 end
 
