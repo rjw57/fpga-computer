@@ -93,7 +93,7 @@ end
 
 led led(
   //.r(addr[15:8] == 0), .g(io_port[0]), .b(cpu_writing),
-  .r(io_port[5]), .g(io_port[6]), .b(io_port[7]),
+  .r(io_port[0]), .g(io_port[1]), .b(io_port[2]),
   .rgb0(RGB0), .rgb1(RGB1), .rgb2(RGB2)
 );
 

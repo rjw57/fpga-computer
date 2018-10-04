@@ -25,6 +25,6 @@ void init(void) {
 static u8 ctr = 0;
 void idle(void) {
     u16 i;
-    for(i=0; i<0x300; ++i) { }
+    for(i=0; i<0x1000; ++i) { }
     *((u8*)(0x0400)) = ++ctr;
 }
