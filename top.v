@@ -6,7 +6,7 @@ module top(
 );
 
 // Width of CPU clock frequency divider
-localparam CPU_CLOCK_DIV_W = 4;
+localparam CPU_CLOCK_DIV_W = 3;
 
 // Construct video dot clock
 wire dot_clk;
