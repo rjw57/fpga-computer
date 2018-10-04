@@ -4,3 +4,4 @@
 *.gtkw
 *.vcd
 *_tb.out
+bootrom.hex

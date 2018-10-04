@@ -3,3 +3,11 @@ root=true
 [*.v]
 indent_style=space
 indent_size=2
+
+[*.{c,h}]
+indent_style=space
+indent_size=4
+
+[*.s]
+indent_style=space
+indent_size=8
