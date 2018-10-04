@@ -59,7 +59,7 @@ cpu_65c02 cpu(
 
 always @*
 begin
-  if (io_addr[15:14] == 2'b11)
+  if (io_addr[15:11] == 5'b11111)
     cpu_data_in <= bootrom_data_out;
   else if (io_addr[15] == 2'b0)
     cpu_data_in <= ram_data_out;
@@ -71,7 +71,7 @@ end
 wire [7:0] bootrom_data_out;
 bootrom bootrom(
   .clk(cpu_clk),
-  .addr(addr[12:0]),
+  .addr(addr[10:0]),
   .data(bootrom_data_out)
 );
 
