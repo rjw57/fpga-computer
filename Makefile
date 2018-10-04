@@ -13,6 +13,7 @@ CPU_SOURCES = cpu/ALU.v cpu/cpu_65c02.v
 SOURCES = \
 	$(CPU_SOURCES) \
 	bootrom.v \
+	io.v \
 	ram.v \
 	reset_timer.v \
 	top.v
