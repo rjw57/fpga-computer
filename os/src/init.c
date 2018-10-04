@@ -24,7 +24,13 @@ void init(void) {
     while(1) { idle(); }
 }
 
+void delay(void) {
+    u16 i = 0x2000;
+    while(i) { --i; }
+}
+
 static u8 ctr = 0;
 void idle(void) {
+    delay();
     IO_PORT = ++ctr;
 }
