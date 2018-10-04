@@ -13,6 +13,7 @@ CPU_SOURCES = cpu/ALU.v cpu/cpu_65c02.v
 SOURCES = \
 	$(CPU_SOURCES) \
 	bootrom.v \
+	bootrom.placeholder.hex \
 	io.v \
 	ram.v \
 	reset_timer.v \
@@ -21,8 +22,6 @@ SOURCES = \
 HW_EXTRA_SOURCES = hw/pll.v hw/led.v
 
 SIM_EXTRA_SOURCES = sim/pll.v sim/led.v
-
-EXTRA_DEPS = bootrom.hex
 
 all: $(PROJ).bin
 
@@ -40,11 +39,17 @@ os/rom.bin:
 bootrom.hex: os/rom.bin
 	hexdump -v -e '/1 "%02x\n"' >"$@" <"$<"
 
-%.blif: $(SOURCES) $(HW_EXTRA_SOURCES) $(EXTRA_DEPS)
+bootrom.placeholder.hex:
+	icebram -g -s 1234 8 2048 >"$@"
+
+%.blif: $(SOURCES) $(HW_EXTRA_SOURCES)
 	yosys -p 'synth_ice40 -top top -blif $@' $(filter %.v, $^)
 
-%.asc: $(PIN_DEF) %.blif
+%.tmp.asc: $(PIN_DEF) %.blif
 	$(ARACHNE) $(ARACHNE_ARGS) -d $(subst up,,$(subst hx,,$(subst lp,,$(DEVICE)))) -o $@ -p $^
+
+%.asc: %.tmp.asc bootrom.hex
+	icebram bootrom.placeholder.hex bootrom.hex <"$<" >"$@"
 
 %.bin: %.asc
 	$(ICEPACK) $< $@
@@ -52,7 +57,7 @@ bootrom.hex: os/rom.bin
 %.rpt: %.asc
 	$(ICETIME) -d $(DEVICE) -mtr $@ $<
 
-%_tb.out: %_tb.v $(SOURCES) $(SIM_EXTRA_SOURCES) $(EXTRA_DEPS)
+%_tb.out: %_tb.v $(SOURCES) $(SIM_EXTRA_SOURCES)
 	iverilog -o $@ $(filter %.v, $^) `yosys-config --datdir/ice40/cells_sim.v`
 
 %_tb.vcd: %_tb.out
@@ -61,7 +66,7 @@ bootrom.hex: os/rom.bin
 %_syn.v: %.blif
 	yosys -p 'read_blif -wideports $^; write_verilog $@'
 
-%_syntb: %_tb.v %_syn.v $(SIM_EXTRA_SOURCES) $(EXTRA_DEPS)
+%_syntb: %_tb.v %_syn.v $(SIM_EXTRA_SOURCES)
 	iverilog -o $@ $(filter %.v, $^) `yosys-config --datdir/ice40/cells_sim.v`
 
 %_syntb.vcd: %_syntb

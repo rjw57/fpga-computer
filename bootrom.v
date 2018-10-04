@@ -18,6 +18,6 @@ module bootrom (
   end
 
   initial begin
-    $readmemh("bootrom.hex", mem, 0, (1<<ADDR_W)-1);
+    $readmemh("bootrom.placeholder.hex", mem, 0, (1<<ADDR_W)-1);
   end
 endmodule

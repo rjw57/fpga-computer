@@ -5,3 +5,5 @@
 *.vcd
 *_tb.out
 bootrom.hex
+bootrom.placeholder.hex
+*.tmp.asc
