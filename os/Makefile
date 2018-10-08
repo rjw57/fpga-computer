@@ -22,6 +22,9 @@ ifeq ($(AR65),)
 $(error The ar65 tool was not found. Try setting the CC65_DIR variable.)
 endif
 
+# Find the base of the cc65 install
+CC65_BASE=$(shell dirname "$(CL65)")/..
+
 # Source files which make up this project
 ROM_SRCS+=$(wildcard $(ASMINC_DIR)/*.inc)
 ROM_SRCS+=$(wildcard $(HDR_DIR)/*.h)
@@ -59,7 +62,9 @@ CL65_FLAGS+=-t none
 CL65_FLAGS+=-C "$(LINK_CONFIG)"
 
 # Append include file locations to cl65 command line
-CL65_FLAGS+=--asm-include-dir $(ASMINC_DIR) -I $(HDR_DIR)
+CL65_FLAGS+=--asm-include-dir $(ASMINC_DIR) -I $(HDR_DIR) \
+	--asm-include-dir $(CC65_BASE)/share/cc65/asminc \
+	-L $(CC65_BASE)/share/cc65/lib
 
 # ROM output
 ROM_BIN:=rom.bin
