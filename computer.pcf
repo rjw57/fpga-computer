@@ -4,3 +4,18 @@ set_io CLOCK_12M 12
 set_io RGB0 39
 set_io RGB1 40
 set_io RGB2 41
+
+set_io G[0] 28
+set_io G[1] 38
+set_io G[2] 42
+set_io G[3] 36
+set_io B[0] 43
+set_io B[1] 34
+set_io B[2] 37
+set_io B[3] 31
+set_io R[0] 35
+set_io R[1] 32
+set_io R[2] 27
+set_io R[3] 26
+set_io HSYNC 25
+set_io VSYNC 23

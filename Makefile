@@ -17,7 +17,8 @@ SOURCES = \
 	io.v \
 	ram.v \
 	reset_timer.v \
-	top.v
+	top.v \
+	vdp.v
 
 HW_EXTRA_SOURCES = hw/pll.v hw/led.v
 

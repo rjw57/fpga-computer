@@ -1,5 +1,12 @@
 module top(
   input CLOCK_12M,
+
+  output [3:0] R,
+  output [3:0] G,
+  output [3:0] B,
+  output HSYNC,
+  output VSYNC,
+
   output RGB0,
   output RGB1,
   output RGB2
@@ -18,6 +25,13 @@ assign clk = dot_clk;
 
 // Reset line. We tie it to the CPU clock as the slowest clock in the system.
 reset_timer reset_timer(.clk(cpu_clk), .reset(reset));
+
+// VDP
+vdp vdp(
+  .dot_clk(dot_clk),
+  .r(R), .g(G), .b(B),
+  .hsync(HSYNC), .vsync(VSYNC)
+);
 
 // CPU clock
 reg [CPU_CLOCK_DIV_W-1:0] cpu_clk_ctr = 0;
