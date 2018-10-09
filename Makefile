@@ -15,8 +15,12 @@ SOURCES = \
 	bootrom.v \
 	bootrom.placeholder.hex \
 	io.v \
+	nameram.v \
+	nameram.hex \
 	ram.v \
 	reset_timer.v \
+	tileram.v \
+	tileram.hex \
 	top.v \
 	vdp.v
 
