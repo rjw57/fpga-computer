@@ -12,8 +12,8 @@ module top(
   output RGB2
 );
 
-// Width of CPU clock frequency divider
-localparam CPU_CLOCK_DIV_W = 3;
+// CPU clock frequency divider
+localparam CPU_CLOCK_DIV = 6;
 
 // Construct video dot clock
 wire dot_clk;
@@ -34,11 +34,19 @@ vdp vdp(
 );
 
 // CPU clock
-reg [CPU_CLOCK_DIV_W-1:0] cpu_clk_ctr = 0;
-assign cpu_clk = cpu_clk_ctr[CPU_CLOCK_DIV_W-1];
+reg [3:0] cpu_clk_ctr = 4'b0;
+reg cpu_clk = 1'b0;
 always @(posedge clk)
 begin
-  cpu_clk_ctr <= cpu_clk_ctr + 1;
+  if(cpu_clk_ctr == CPU_CLOCK_DIV-1)
+    begin
+      cpu_clk_ctr <= 4'b0;
+      cpu_clk <= ~cpu_clk;
+    end
+  else
+    begin
+      cpu_clk_ctr <= cpu_clk_ctr + 1;
+    end
 end
 
 // CPU Bus

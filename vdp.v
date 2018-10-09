@@ -12,12 +12,22 @@ module vdp (
 // stage 1
 
 // outputs
-reg [9:0] column_1;
-reg [8:0] line_1;
+reg [10:0] column_1;
+reg [10:0] line_1;
 reg hsync_1, vsync_1;
 reg h_visible_1, v_visible_1;
 wire visible_1 = h_visible_1 & v_visible_1;
 wire [11:0] tile_addr_1;
+
+// 2x2 pixels
+/*
+assign tile_addr_1[11:6] = line_1[9:4];
+assign tile_addr_1[5:0] = column_1[9:4];
+wire [2:0] tile_column_1 = column_1[3:1];
+wire [2:0] tile_row_1 = line_1[3:1];
+*/
+
+// 1x1 pixels
 assign tile_addr_1[11:6] = line_1[8:3];
 assign tile_addr_1[5:0] = column_1[8:3];
 wire [2:0] tile_column_1 = column_1[2:0];
@@ -32,30 +42,30 @@ begin
     end
   else
     begin
-      if(column_1 == 639)
+      if(column_1 == 1023)
         h_visible_1 <= 1'b0;
 
-      if(column_1 == 655)
+      if(column_1 == 1023+24)
         hsync_1 <= 1'b0;
 
-      if(column_1 == 719)
+      if(column_1 == 1023+24+136)
         hsync_1 <= 1'b1;
 
-      if(column_1 == 839)
+      if(column_1 == 1343)
         begin
           h_visible_1 <= 1'b1;
           column_1 <= 10'b0;
 
-          if(line_1 == 479)
+          if(line_1 == 767)
             v_visible_1 <= 1'b0;
 
-          if(line_1 == 480)
+          if(line_1 == 767+3)
             vsync_1 <= 1'b0;
 
-          if(line_1 == 483)
+          if(line_1 == 767+3+6)
             vsync_1 <= 1'b1;
 
-          if(line_1 == 499)
+          if(line_1 == 805)
             begin
               v_visible_1 <= 1'b1;
               line_1 <= 9'b0;
