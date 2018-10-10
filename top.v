@@ -27,10 +27,16 @@ assign clk = dot_clk;
 reset_timer reset_timer(.clk(cpu_clk), .reset(reset));
 
 // VDP
+wire vdp_select = (addr[15:14] == 2'b10) ? 1'b1 : 1'b0;
 vdp vdp(
   .dot_clk(dot_clk),
   .r(R), .g(G), .b(B),
-  .hsync(HSYNC), .vsync(VSYNC)
+  .hsync(HSYNC), .vsync(VSYNC),
+
+  .write_clk(cpu_clk),
+  .write_data(cpu_data_out),
+  .write_addr(addr[13:0]),
+  .write_enable(vdp_select & cpu_writing)
 );
 
 // CPU clock
