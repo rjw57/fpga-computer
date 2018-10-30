@@ -43,6 +43,7 @@ static u16 name_addr = 0, tile_addr = 0;
 void idle(void) {
     //delay();
     IO_PORT = ++ctr;
+    return;
 
     NAME_TABLE[(name_addr<<1)] = rand();
     NAME_TABLE[(name_addr<<1)+1] = rand();
@@ -53,7 +54,7 @@ void idle(void) {
     */
     tile_addr = (tile_addr + 1) & 0x07ff;
 
-    //if(name_addr != 0x0fff) {
+    if(name_addr != 0x0fff) {
         name_addr = (name_addr + 1) & 0x0fff;
-    //}
+    }
 }

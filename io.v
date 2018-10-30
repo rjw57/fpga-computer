@@ -1,6 +1,8 @@
 // Synchronous IO. Data available clock tick *after* address is valid.
 module io(
-  input clk,
+  input dot_clk,
+  output cpu_clk,
+
   input [15:0] addr,
   input [7:0] data_in,
   output [7:0] data_out,
@@ -9,49 +11,61 @@ module io(
   output reg [7:0] io_port
 );
 
-wire ram_1_select = (addr[15] == 1'b0) ? 1'b1 : 1'b0;
-wire ram_2_select = (addr[15] == 1'b1) ? 1'b1 : 1'b0;
+//wire ram_select = (addr[15] == 1'b0) ? 1'b1 : 1'b0;
 wire rom_select = (addr[15:11] == 5'b11111) ? 1'b1 : 1'b0;
-wire io_port_select = (addr== 16'h8400) ? 1'b1 : 1'b0;
+wire ram_select = ~rom_select;
+wire io_port_select = (addr == 16'h8400) ? 1'b1 : 1'b0;
 
-reg ram_1_select_reg, ram_2_select_reg, rom_select_reg, io_port_select_reg;
-assign data_out = rom_select_reg ? rom_data_out : 8'bZ;
-assign data_out = ram_1_select_reg ? ram_1_data_out : 8'bZ;
-assign data_out = (ram_2_select_reg && ~rom_select_reg) ? ram_2_data_out : 8'bZ;
-always @(posedge clk)
+reg rom_select_reg, ram_select_reg;
+wire [7:0] rom_data_out;
+wire [7:0] ram_data_out;
+
+always @(posedge cpu_clk)
 begin
-  ram_1_select_reg <= ram_1_select;
-  ram_2_select_reg <= ram_2_select;
   rom_select_reg <= rom_select;
-  io_port_select_reg <= io_port_select;
+  ram_select_reg <= ram_select;
 end
 
-wire [7:0] rom_data_out;
+assign data_out = rom_select_reg ? rom_data_out : 8'bZ;
+assign data_out = ram_select_reg ? ram_data_out : 8'bZ;
+
+/*
+always @(negedge cpu_clk)
+begin
+  if(rom_select_reg) data_out <= rom_data_out;
+  if(ram_select_reg) data_out <= ram_data_out;
+end
+*/
+
 bootrom bootrom(
-  .clk(clk),
+  .clk(~cpu_clk),
   .addr(addr[10:0]),
   .data(rom_data_out)
 );
 
-wire [7:0] ram_1_data_out;
-ram ram_1(
-  .clk(clk),
-  .addr(addr[14:0]),
-  .data_in(data_in),
-  .data_out(ram_1_data_out),
-  .write_enable(write_enable && ram_1_select)
+vram vram(
+  .clk(dot_clk),
+  .cpu_clk(cpu_clk),
+
+  .vram_addr(16'h0),
+  .vram_data_in(8'h0),
+  .vram_write_enable(1'b0),
+
+  .cpu_addr(addr),
+  .cpu_data_in(data_in),
+  //.cpu_data_out(ram_data_out),
+  .cpu_write_enable(write_enable)
 );
 
-wire [7:0] ram_2_data_out;
-ram ram_2(
-  .clk(clk),
+spram32k8 ram(
+  .clk(~cpu_clk),
   .addr(addr[14:0]),
   .data_in(data_in),
-  .data_out(ram_2_data_out),
-  .write_enable(write_enable && ram_2_select)
+  .data_out(ram_data_out),
+  .write_enable(write_enable && ram_select && (~addr[15]))
 );
 
-always @(posedge clk)
+always @(negedge cpu_clk)
 begin
   if(write_enable && io_port_select)
     io_port <= data_in;

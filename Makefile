@@ -8,21 +8,24 @@ ICEPACK = icepack
 ICETIME = icetime
 ICEPROG = iceprog
 
-CPU_SOURCES = cpu/ALU.v cpu/cpu_65c02.v
+#CPU_SOURCES = cpu/ALU.v cpu/cpu_65c02.v
+CPU_SOURCES = bc6502/bc6502.v bc6502/addsub.v
+VRAM_SOURCES = vram/vram.v vram/spram32k8.v
 
 SOURCES = \
 	$(CPU_SOURCES) \
+	$(VRAM_SOURCES) \
 	bootrom.v \
 	bootrom.placeholder.hex \
 	io.v \
 	nameram.v \
 	nameram.hex \
-	ram.v \
 	reset_timer.v \
 	tileram.v \
 	tileram.hex \
 	top.v \
-	vdp.v
+	vdp.v \
+	vgatiming.v
 
 HW_EXTRA_SOURCES = hw/pll.v hw/led.v
 
@@ -32,7 +35,7 @@ all: $(PROJ).bin
 
 .PHONY: all
 
-sim: example_tb.vcd
+sim: example_tb.vcd vram_tb.vcd
 
 .PHONY: sim
 

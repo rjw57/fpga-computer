@@ -1,10 +1,14 @@
 // 32KB RAM
-module ram(
+module spram32k8(
   input clk,
   input [14:0] addr,
+
+  // when CLK -> high and write_enable high, data is written to address
+  input write_enable,
   input [7:0] data_in,
-  output [7:0] data_out,
-  input write_enable
+
+  // when CLK -> high, this is data at address
+  output [7:0] data_out
 );
   wire [15:0] spram_datain;
   assign spram_datain[15:8] = data_in;

@@ -21,7 +21,7 @@ module testbench;
   end
 
   initial begin
-    repeat (30000) @(posedge clk);
+    repeat (50000) @(posedge clk);
 
     $finish;
   end
