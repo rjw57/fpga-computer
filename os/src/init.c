@@ -33,8 +33,8 @@ void init(void) {
 }
 
 void delay(void) {
-    //u16 i = 0x2000;
-    u16 i = 0x20;
+    u16 i = 0x2000;
+    //u16 i = 0x20;
     while(i) { --i; }
 }
 
@@ -43,6 +43,7 @@ static u16 name_addr = 0, tile_addr = 0;
 void idle(void) {
     //delay();
     IO_PORT = ++ctr;
+    delay();
     return;
 
     NAME_TABLE[(name_addr<<1)] = rand();

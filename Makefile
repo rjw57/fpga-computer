@@ -8,8 +8,8 @@ ICEPACK = icepack
 ICETIME = icetime
 ICEPROG = iceprog
 
-#CPU_SOURCES = cpu/ALU.v cpu/cpu_65c02.v
-CPU_SOURCES = bc6502/bc6502.v bc6502/addsub.v
+CPU_SOURCES = cpu/ALU.v cpu/cpu_65c02.v
+#CPU_SOURCES = bc6502/bc6502.v bc6502/addsub.v
 VRAM_SOURCES = vram/vram.v vram/spram32k8.v
 
 SOURCES = \

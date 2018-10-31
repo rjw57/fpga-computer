@@ -13,84 +13,32 @@ module top(
 );
 
 // CPU Bus
-wire cpu_clk;
-wire [15:0] addr;
-wire [7:0] cpu_data_in;
-wire [7:0] cpu_data_out;
-wire cpu_writing;
+wire r;
+wire g;
+wire b;
+wire [7:0] io_port;
 
 // Construct video dot clock
-wire dot_clk;
-pll pll(.clock_in(CLOCK_12M), .clock_out(dot_clk));
+wire dot_clk, clk_out;
+pll pll(.clock_in(CLOCK_12M), .clock_out(clk_out));
 
-// Reset line. We tie it to the CPU clock as the slowest clock in the system.
-reset_timer reset_timer(.clk(cpu_clk), .reset(reset));
-
-// VDP
-wire vdp_select = (addr[15:14] == 2'b10) ? 1'b1 : 1'b0;
-vdp vdp(
-  .dot_clk(dot_clk),
-  .r(R), .g(G), .b(B),
-  .hsync(HSYNC), .vsync(VSYNC),
-
-  .write_clk(cpu_clk),
-  .write_data(cpu_data_out),
-  .write_addr(addr[13:0]),
-  .write_enable(vdp_select & cpu_writing)
-);
-
-// The CPU itself
+assign dot_clk = clk_out;
 /*
-cpu_65c02 cpu(
-  .clk(cpu_clk),
-  .reset(reset),
-
-  .NMI(1'b0),
-  .IRQ(1'b0),
-
-  .RDY(1'b1),
-
-  .WE(cpu_writing),
-  .DI(cpu_data_in),
-  .DO(cpu_data_out),
-  .AB(addr)
-);
+reg [32:0] ctr;
+always @(posedge clk_out) ctr <= ctr + 1;
+assign dot_clk = ctr[18];
 */
 
-wire cpu_reading;
-assign cpu_writing = ~cpu_reading;
-
-bc6502 cpu(
-  .reset(reset),
-  .clk(cpu_clk),
-
-  .nmi(1'b0),
-  .irq(1'b0),
-  .rdy(1'b1),
-  .so(1'b0),
-
-  .ma_nxt(addr),
-  .rw_nxt(cpu_reading),
-  .di(cpu_data_in),
-  .do(cpu_data_out)
-);
-
-wire [7:0] io_port;
-io io(
+computer computer(
   .dot_clk(dot_clk),
-  .cpu_clk(cpu_clk),
-
-  .addr(addr),
-  .data_in(cpu_data_out),
-  .data_out(cpu_data_in),
-  .write_enable(cpu_writing),
-
-  .io_port(io_port)
+  .io_port(io_port),
+  .r(r), .g(g), .b(b),
+  .hsync(HSYNC), .vsync(VSYNC)
 );
 
 led led(
-  //.r(addr[15]), .g(io_port[0]), .b(cpu_writing),
   .r(io_port[0]), .g(io_port[1]), .b(io_port[2]),
+  //.r(dot_clk), .g(io_port[1]), .b(io_port[2]),
   .rgb0(RGB0), .rgb1(RGB1), .rgb2(RGB2)
 );
 
