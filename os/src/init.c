@@ -26,7 +26,7 @@ void init(void) {
     // enable interrupts
     IRQ_ENABLE();
 
-    srand(1234);
+    //srand(1234);
 
     // loop forever
     while(1) { idle(); }

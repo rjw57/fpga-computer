@@ -17,6 +17,7 @@ SOURCES = \
 	$(VRAM_SOURCES) \
 	bootrom.v \
 	bootrom.placeholder.hex \
+	computer.v \
 	io.v \
 	nameram.v \
 	nameram.hex \
@@ -35,7 +36,7 @@ all: $(PROJ).bin
 
 .PHONY: all
 
-sim: example_tb.vcd vram_tb.vcd
+sim: vram_tb.vcd bc6502/bc6502_tb.vcd
 
 .PHONY: sim
 

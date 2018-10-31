@@ -1,14 +1,12 @@
 `timescale 1ns/10ps
 
 module testbench;
-  // 12MHz clock
+  // 31.5MHz clock
   reg clk;
-  always #83.33333 clk = (clk === 1'b0);
+  always #31.75 clk = (clk === 1'b0);
 
-  wire addr0;
-
-  top top(
-    .CLOCK_12M(clk)
+  computer computer(
+    .dot_clk(clk)
   );
 
   reg [4095:0] vcdfile;
@@ -21,8 +19,7 @@ module testbench;
   end
 
   initial begin
-    repeat (50000) @(posedge clk);
-
+    repeat (1000) @(posedge clk);
     $finish;
   end
 endmodule
