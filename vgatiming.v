@@ -35,6 +35,10 @@ begin
     begin
       column <= 0;
       line <= 0;
+      h_visible <= 1;
+      v_visible <= 1;
+      hsync <= H_SYNC_POSITIVE ? 1'b0 : 1'b1;
+      vsync <= V_SYNC_POSITIVE ? 1'b0 : 1'b1;
     end
   else
     begin

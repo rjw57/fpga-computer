@@ -3,40 +3,65 @@ module computer(
 
   output [7:0] io_port,
 
-  output r,
-  output g,
-  output b,
+  output [3:0] r,
+  output [3:0] g,
+  output [3:0] b,
   output hsync,
   output vsync
 );
 
+// System lines
+wire reset;
+
 // CPU Bus
+wire cpu_reset;
 wire cpu_clk;
 wire [15:0] cpu_addr;
-wire [7:0] cpu_data_in;
+reg [7:0] cpu_data_in;
 wire [7:0] cpu_data_out;
 wire cpu_writing;
 
+// Video bus
+wire [15:0] vdp_addr;
+
+// Memory data lines
 wire [7:0] rom_data;
 wire [7:0] ram_data;
 
-// Register CPU address bus o negative edge of CPU clock so that select lines
-// remain valid into next cycle.
-reg [15:0] addr_reg;
-always @(negedge cpu_clk) addr_reg <= cpu_addr;
-assign cpu_data_in = (addr_reg[15:11] == 5'b11111) ? rom_data : ram_data;
+// System reset line
+reset_timer system_reset_timer(.clk(dot_clk), .reset(reset));
 
-// Reset line. We tie it to the CPU clock as the slowest clock in the system.
-reset_timer reset_timer(.clk(cpu_clk), .reset(reset));
+// CPU Reset line
+reset_timer reset_timer(.clk(cpu_clk), .reset(cpu_reset));
 
+vdp vdp(
+  .reset(reset),
+  .dot_clk(dot_clk),
+
+  // VDP acts as CPU clock generator
+  .cpu_clk(cpu_clk),
+
+  // VDP *always* reads from RAM, never memory-mapped IO.
+  .addr(vdp_addr),
+  .data_in(ram_data),
+
+  // VDP completely handles display-related outputs
+  .r(r), .g(g), .b(b), .hsync(hsync), .vsync(vsync)
+);
+
+// While the CPU clock is low, keep latching data for next cycle.
+reg [7:0] cpu_data_in_next;
+always @(negedge dot_clk)
+begin
+  if(~cpu_clk)
+    cpu_data_in_next <= (cpu_addr[15:11] == 5'b11111) ? rom_data : ram_data;
+end
+
+// Latch writes to IO port
 reg [7:0] io_port = 0;
 always @(negedge cpu_clk)
 begin
-  //io_port <= cpu_addr[7:0];
-  //if(cpu_addr == 16'h2e2e) io_port <= 8'hff;
-  //if((cpu_addr == 16'hFFFD) && (cpu_data_in == 8'hF8)) io_port <= 8'hff;
   if(cpu_writing && cpu_addr == 16'h8400) io_port <= cpu_data_out;
-  //io_port <= cpu_addr[15:8];
 end
 
 // Form a derived CPU clock which is one dot clock delayed. We need this because
@@ -47,11 +72,10 @@ always @(posedge dot_clk) cpu_clk_delay <= cpu_clk;
 
 // The data in lines to the CPU are latched just after the positive CPU clock
 // edge. They related to the preceding cycle's address.
-reg [7:0] cpu_data_in_reg;
-always @(posedge cpu_clk_delay) cpu_data_in_reg <= cpu_data_in;
+always @(posedge cpu_clk_delay) cpu_data_in <= cpu_data_in_next;
 
 cpu_65c02 cpu(
-  .reset(reset),
+  .reset(reset || cpu_reset),
   .clk(cpu_clk),
 
   .NMI(1'b0),
@@ -60,30 +84,34 @@ cpu_65c02 cpu(
 
   .AB(cpu_addr),
   .WE(cpu_writing),
-  .DI(cpu_data_in_reg),
+  .DI(cpu_data_in),
   .DO(cpu_data_out)
 );
 
 // Boot ROM
 bootrom rom(
-  .clk(~cpu_clk),
+  .clk(dot_clk),
   .addr(cpu_addr[10:0]),
   .data(rom_data)
 );
 
-// VRAM
-vram vram(
+// Turn CPU write enable on falling edge of CPU clock into one dot-clock length
+// pulse.
+reg ram_we;
+reg prev_cpu_we;
+always @(negedge dot_clk)
+begin
+  ram_we <= (cpu_writing && ~cpu_clk) && ~prev_cpu_we;
+  prev_cpu_we <= cpu_writing && ~cpu_clk;
+end
+
+sram ram(
   .clk(dot_clk),
-  .cpu_clk(cpu_clk),
-
-  .vram_addr(16'h0),
-  .vram_data_in(8'h0),
-  .vram_write_enable(1'b0),
-
-  .cpu_addr(cpu_addr),
-  .cpu_data_in(cpu_data_out),
-  .cpu_data_out(ram_data),
-  .cpu_write_enable(cpu_writing)
+  // CPU has access while CPU clock low, VDP while CPU clock is high
+  .addr(cpu_clk ? vdp_addr : cpu_addr),
+  .data_in(cpu_data_out),
+  .data_out(ram_data),
+  .write_enable(ram_we)
 );
 
 endmodule
