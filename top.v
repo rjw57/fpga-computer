@@ -13,13 +13,13 @@ module top(
 );
 
 wire [7:0] io_port;
-wire dot_clk;
+wire clk;
 
 // Construct video dot clock
-pll pll(.clock_in(CLOCK_12M), .clock_out(dot_clk));
+pll pll(.clock_in(CLOCK_12M), .clock_out(clk));
 
 computer computer(
-  .dot_clk(dot_clk),
+  .clk(clk),
   .io_port(io_port),
   .r(R), .g(G), .b(B),
   .hsync(HSYNC), .vsync(VSYNC)

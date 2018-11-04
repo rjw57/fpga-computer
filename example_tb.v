@@ -1,12 +1,12 @@
 `timescale 1ns/10ps
 
 module testbench;
-  // 31.5MHz clock
+  // 2 * 31.5MHz clock
   reg clk;
-  always #31.75 clk = (clk === 1'b0);
+  always #(1000.0 / (2 * 31.5)) clk = (clk === 1'b0);
 
   computer computer(
-    .dot_clk(clk)
+    .clk(clk)
   );
 
   reg [4095:0] vcdfile;

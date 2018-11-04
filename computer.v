@@ -1,5 +1,5 @@
 module computer(
-  input dot_clk,
+  input clk,
 
   output [7:0] io_port,
 
@@ -29,29 +29,22 @@ wire [7:0] rom_data;
 wire [7:0] ram_data;
 
 // System reset line
-reset_timer system_reset_timer(.clk(dot_clk), .reset(reset));
+reset_timer system_reset_timer(.clk(clk), .reset(reset));
 
 // CPU Reset line
 reset_timer reset_timer(.clk(cpu_clk), .reset(cpu_reset));
 
-vdp vdp(
-  .reset(reset),
-  .dot_clk(dot_clk),
-
-  // VDP acts as CPU clock generator
-  .cpu_clk(cpu_clk),
-
-  // VDP *always* reads from RAM, never memory-mapped IO.
-  .addr(vdp_addr),
-  .data_in(ram_data),
-
-  // VDP completely handles display-related outputs
-  .r(r), .g(g), .b(b), .hsync(hsync), .vsync(vsync)
-);
+parameter CPU_DIV_W = 4;
+reg [CPU_DIV_W-1:0] cpu_clk_ctr = 0;
+assign cpu_clk = cpu_clk_ctr[CPU_DIV_W-1];
+always @(posedge clk)
+begin
+  cpu_clk_ctr <= cpu_clk_ctr + 1;
+end
 
 // While the CPU clock is low, keep latching data for next cycle.
 reg [7:0] cpu_data_in_next;
-always @(negedge dot_clk)
+always @(negedge clk)
 begin
   if(~cpu_clk)
     cpu_data_in_next <= (cpu_addr[15:11] == 5'b11111) ? rom_data : ram_data;
@@ -68,11 +61,12 @@ end
 // the data in to the CPU needs to be updated just *after* the positive edge for
 // the following cycle.
 reg cpu_clk_delay;
-always @(posedge dot_clk) cpu_clk_delay <= cpu_clk;
+always @(posedge clk) cpu_clk_delay <= cpu_clk;
 
 // The data in lines to the CPU are latched just after the positive CPU clock
 // edge. They related to the preceding cycle's address.
-always @(posedge cpu_clk_delay) cpu_data_in <= cpu_data_in_next;
+//always @(posedge cpu_clk_delay) cpu_data_in <= cpu_data_in_next;
+always @(posedge cpu_clk) cpu_data_in <= (cpu_addr[15:11] == 5'b11111) ? rom_data : ram_data;
 
 cpu_65c02 cpu(
   .reset(reset || cpu_reset),
@@ -90,7 +84,7 @@ cpu_65c02 cpu(
 
 // Boot ROM
 bootrom rom(
-  .clk(dot_clk),
+  .clk(clk),
   .addr(cpu_addr[10:0]),
   .data(rom_data)
 );
@@ -99,14 +93,14 @@ bootrom rom(
 // pulse.
 reg ram_we;
 reg prev_cpu_we;
-always @(negedge dot_clk)
+always @(negedge clk)
 begin
   ram_we <= (cpu_writing && ~cpu_clk) && ~prev_cpu_we;
   prev_cpu_we <= cpu_writing && ~cpu_clk;
 end
 
 sram ram(
-  .clk(dot_clk),
+  .clk(clk),
   // CPU has access while CPU clock low, VDP while CPU clock is high
   .addr(cpu_clk ? vdp_addr : cpu_addr),
   .data_in(cpu_data_out),

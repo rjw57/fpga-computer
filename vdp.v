@@ -38,6 +38,6 @@ vgatiming timing(
   .vsync(vsync)
 );
 
-assign cpu_clk = ~dot[2];
+assign cpu_clk = ~char[0];
 
 endmodule
