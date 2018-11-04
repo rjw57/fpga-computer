@@ -18,6 +18,7 @@ SOURCES = \
 	bootrom.v \
 	bootrom.placeholder.hex \
 	computer.v \
+	dpram.v \
 	io.v \
 	nameram.v \
 	nameram.hex \

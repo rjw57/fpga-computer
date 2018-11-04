@@ -21,6 +21,9 @@ reg [7:0] cpu_data_in;
 wire [7:0] cpu_data_out;
 wire cpu_writing;
 
+// Memory
+wire mem_clk;
+
 // Video bus
 wire [15:0] vdp_addr;
 
@@ -31,16 +34,17 @@ wire [7:0] ram_data;
 // System reset line
 reset_timer system_reset_timer(.clk(clk), .reset(reset));
 
-// CPU Reset line
-reset_timer reset_timer(.clk(cpu_clk), .reset(cpu_reset));
-
-parameter CPU_DIV_W = 4;
+// Derive CPU clock from memory clock
+parameter CPU_DIV_W = 3;
 reg [CPU_DIV_W-1:0] cpu_clk_ctr = 0;
 assign cpu_clk = cpu_clk_ctr[CPU_DIV_W-1];
-always @(posedge clk)
+always @(posedge mem_clk)
 begin
   cpu_clk_ctr <= cpu_clk_ctr + 1;
 end
+
+// CPU Reset line
+reset_timer reset_timer(.clk(cpu_clk), .reset(cpu_reset));
 
 // While the CPU clock is low, keep latching data for next cycle.
 reg [7:0] cpu_data_in_next;
@@ -57,16 +61,9 @@ begin
   if(cpu_writing && cpu_addr == 16'h8400) io_port <= cpu_data_out;
 end
 
-// Form a derived CPU clock which is one dot clock delayed. We need this because
-// the data in to the CPU needs to be updated just *after* the positive edge for
-// the following cycle.
-reg cpu_clk_delay;
-always @(posedge clk) cpu_clk_delay <= cpu_clk;
-
-// The data in lines to the CPU are latched just after the positive CPU clock
-// edge. They related to the preceding cycle's address.
-//always @(posedge cpu_clk_delay) cpu_data_in <= cpu_data_in_next;
-always @(posedge cpu_clk) cpu_data_in <= (cpu_addr[15:11] == 5'b11111) ? rom_data : ram_data;
+// Latch CPU data in line on rising edge of CPU clock
+always @(posedge cpu_clk)
+  cpu_data_in <= (cpu_addr[15:11] == 5'b11111) ? rom_data : ram_data;
 
 cpu_65c02 cpu(
   .reset(reset || cpu_reset),
@@ -93,19 +90,37 @@ bootrom rom(
 // pulse.
 reg ram_we;
 reg prev_cpu_we;
-always @(negedge clk)
+always @(negedge mem_clk)
 begin
   ram_we <= (cpu_writing && ~cpu_clk) && ~prev_cpu_we;
   prev_cpu_we <= cpu_writing && ~cpu_clk;
 end
 
+reg mem_clk_reg = 0;
+always @(posedge clk) mem_clk_reg <= ~mem_clk_reg;
+assign mem_clk = mem_clk_reg;
+
 sram ram(
-  .clk(clk),
-  // CPU has access while CPU clock low, VDP while CPU clock is high
-  .addr(cpu_clk ? vdp_addr : cpu_addr),
+  .clk(mem_clk),
+  .addr(cpu_addr),
   .data_in(cpu_data_out),
   .data_out(ram_data),
   .write_enable(ram_we)
 );
+
+/*
+dpram ram(
+  .reset(reset),
+  .clk(clk),
+
+  .clk_1(mem_clk),
+  .addr_1(cpu_addr),
+  .data_in_1(cpu_data_out),
+  .data_out_1(ram_data),
+  .write_enable_1(ram_we),
+
+  .addr_2(16'h1234)
+);
+*/
 
 endmodule
