@@ -98,11 +98,11 @@ begin
   prev_cpu_we <= cpu_writing && ~cpu_clk;
 end
 
-/*
 reg mem_clk_reg = 0;
 always @(posedge clk) mem_clk_reg <= ~mem_clk_reg;
 assign mem_clk = mem_clk_reg;
 assign dot_clk = ~mem_clk_reg;
+assign vdp_data = 8'hAD;
 
 sram ram(
   .clk(mem_clk),
@@ -111,8 +111,8 @@ sram ram(
   .data_out(ram_data),
   .write_enable(ram_we)
 );
-*/
 
+/*
 dpram ram(
   .reset(reset),
   .clk(clk),
@@ -124,9 +124,10 @@ dpram ram(
   .write_enable_1(ram_we),
 
   .clk_2(dot_clk),
-  .addr_2(vdp_addr),
+  .addr_2(16'h00d0),
   .data_out_2(vdp_data)
 );
+*/
 
 vdp vdp(
   .reset(reset),

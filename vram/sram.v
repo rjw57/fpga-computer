@@ -1,4 +1,8 @@
 // 64K x 8 RAM
+//
+// Address, data in and write enable lines are latched at +ve clock edge.
+// Output data lines are latched at the same edge and represent data for
+// previous edge's address.
 module sram(
   input clk,
 
@@ -11,10 +15,15 @@ module sram(
 wire [7:0] bank_1_out;
 wire [7:0] bank_2_out;
 reg bank_select;
+reg previous_bank_select;
 
-always @(posedge clk) bank_select <= addr[15];
+always @(posedge clk)
+begin
+  bank_select <= addr[15];
+  previous_bank_select <= bank_select;
+end
 
-assign data_out = bank_select ? bank_2_out : bank_1_out;
+assign data_out = previous_bank_select ? bank_2_out : bank_1_out;
 
 spram32k8 bank_1(
   .clk(clk),

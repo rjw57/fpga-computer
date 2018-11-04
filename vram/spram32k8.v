@@ -1,34 +1,45 @@
-// 32KB RAM
+// Synchronous 32KB RAM
+//
+// Address, data in and write enable lines are latched at +ve clock edge.
+// Output data lines are latched at the same edge and represent data for
+// previous edge's address.
 module spram32k8(
   input clk,
   input [14:0] addr,
-
-  // when CLK -> high and write_enable high, data is written to address
   input write_enable,
   input [7:0] data_in,
-
-  // when CLK -> high, this is data at address
   output [7:0] data_out
 );
+  reg [14:0] addr_reg;
+  reg [7:0] data_in_reg;
+  reg [7:0] data_out;
+  reg write_enable_reg;
+
+  always @(posedge clk)
+  begin
+    // Latch input lines at +ve clock
+    addr_reg <= addr;
+    data_in_reg <= data_in;
+    write_enable_reg <= write_enable;
+
+    // Latch output for previous address
+    data_out <= addr_reg[0] ? spram_dataout[15:8] : spram_dataout[7:0];
+  end
+
   wire [15:0] spram_datain;
-  assign spram_datain[15:8] = data_in;
-  assign spram_datain[7:0] = data_in;
+  assign spram_datain[15:8] = data_in_reg;
+  assign spram_datain[7:0] = data_in_reg;
 
   wire [3:0] spram_maskwren;
-  assign spram_maskwren = (addr[0] == 1'b1) ? 4'b1100 : 4'b0011;
+  assign spram_maskwren = (addr_reg[0] == 1'b1) ? 4'b1100 : 4'b0011;
 
   wire [15:0] spram_dataout;
 
-  reg byte_sel;
-  always @(posedge clk)
-  begin
-    byte_sel <= addr[0];
-  end
-
-  assign data_out = (byte_sel == 1'b1) ? spram_dataout[15:8] : spram_dataout[7:0];
-
+  // ICE40 SPRAM behavior, at +ve clock edge, data read at address is latched
+  // into data output and data written if present => address needs to be present
+  // before clock edge.
   SB_SPRAM256KA spram(
-    .CLOCK(clk),
+    .CLOCK(~clk),
     .ADDRESS(addr[14:1]),
     .DATAIN(spram_datain),
     .MASKWREN(spram_maskwren),
