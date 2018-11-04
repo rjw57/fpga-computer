@@ -21,15 +21,17 @@ reg [7:0] cpu_data_in;
 wire [7:0] cpu_data_out;
 wire cpu_writing;
 
-// Memory
+// CPU memory
 wire mem_clk;
-
-// Video bus
-wire [15:0] vdp_addr;
 
 // Memory data lines
 wire [7:0] rom_data;
 wire [7:0] ram_data;
+
+// VDP
+wire dot_clk;
+wire [15:0] vdp_addr;
+wire [7:0] vdp_data;
 
 // System reset line
 reset_timer system_reset_timer(.clk(clk), .reset(reset));
@@ -96,9 +98,11 @@ begin
   prev_cpu_we <= cpu_writing && ~cpu_clk;
 end
 
+/*
 reg mem_clk_reg = 0;
 always @(posedge clk) mem_clk_reg <= ~mem_clk_reg;
 assign mem_clk = mem_clk_reg;
+assign dot_clk = ~mem_clk_reg;
 
 sram ram(
   .clk(mem_clk),
@@ -107,8 +111,8 @@ sram ram(
   .data_out(ram_data),
   .write_enable(ram_we)
 );
+*/
 
-/*
 dpram ram(
   .reset(reset),
   .clk(clk),
@@ -119,8 +123,19 @@ dpram ram(
   .data_out_1(ram_data),
   .write_enable_1(ram_we),
 
-  .addr_2(16'h1234)
+  .clk_2(dot_clk),
+  .addr_2(vdp_addr),
+  .data_out_2(vdp_data)
 );
-*/
+
+vdp vdp(
+  .reset(reset),
+
+  .clk(dot_clk),
+  .addr(vdp_addr),
+  .data_in(vdp_data),
+
+  .r(r), .g(g), .b(b), .hsync(hsync), .vsync(vsync)
+);
 
 endmodule

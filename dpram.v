@@ -14,25 +14,24 @@ module dpram(
   output [7:0] data_out_2
 );
 
-// Port select - low = port 2, high = port 1
+// Port select for next clock edge - low = port 2, high = port 1
 reg port_select;
 
 reg clk_1;
 reg data_out_1;
 reg data_out_2;
-reg [15:0] addr_reg;
+wire [15:0] addr;
 wire [7:0] ram_data_out;
+
+always @(negedge clk)
+  port_select <= reset ? 1'b0 : ~port_select;
 
 // Derived clocks
 always @(posedge clk) clk_1 <= port_select;
 assign clk_2 = ~clk_1;
 
-// Latched address
-always @(negedge clk)
-  addr_reg <= port_select ? addr_1 : addr_2;
-
-always @(negedge clk)
-  port_select <= reset ? 1'b0 : ~port_select;
+// When clk_1 is high, port 1 has access to RAM
+assign addr = port_select ? addr_1 : addr_2;
 
 // Latch data from previous cycle
 always @(posedge clk)
@@ -45,7 +44,7 @@ end
 
 sram ram(
   .clk(clk),
-  .addr(addr_reg),
+  .addr(addr),
   .data_in(data_in_1),
   .write_enable(port_select && write_enable_1),
   .data_out(ram_data_out)

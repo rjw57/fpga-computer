@@ -1,8 +1,6 @@
 module vdp (
   input reset,
-  input dot_clk,
-
-  output cpu_clk,
+  input clk,
 
   output [15:0] addr,
   input [7:0] data_in,
@@ -22,14 +20,22 @@ wire [8:0] line;
 assign dot = column[2:0];
 assign char = column[9:3];
 
+assign addr = {1'b0, line[7:0], char};
+//assign addr = 16'h8765;
+
+/*
 assign r = visible ? line[7:4] : 4'h0;
 assign g = visible ? char[3:0] : 4'h0;
 assign b = visible ? {line[3], char[6:4]} : 4'h0;
+*/
 
-assign addr = 16'h0;
+// RGB332
+assign r = visible ? {data_in[2:0], 1'b0} : 4'h0;
+assign g = visible ? {data_in[5:3], 1'b0} : 4'h0;
+assign b = visible ? {data_in[7:6], 2'b0} : 4'h0;
 
 vgatiming timing(
-  .dot_clk(dot_clk),
+  .dot_clk(clk),
   .reset(reset),
   .column(column),
   .line(line),
@@ -37,7 +43,5 @@ vgatiming timing(
   .hsync(hsync),
   .vsync(vsync)
 );
-
-assign cpu_clk = ~char[0];
 
 endmodule
