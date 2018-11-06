@@ -17,6 +17,7 @@ wire reset;
 // CPU Bus
 wire cpu_reset;
 wire cpu_clk;
+wire cpu_mem_clk;
 wire [15:0] cpu_addr;
 reg [7:0] cpu_data_in;
 wire [7:0] cpu_data_out;
@@ -38,10 +39,11 @@ reset_timer system_reset_timer(.clk(clk), .reset(reset));
 parameter CPU_DIV_W = 3;
 reg [CPU_DIV_W-1:0] cpu_clk_ctr = 0;
 assign cpu_clk = cpu_clk_ctr[CPU_DIV_W-1];
-always @(posedge clk) cpu_clk_ctr <= reset ? 0 : cpu_clk_ctr + 1;
+assign cpu_mem_clk = cpu_clk_ctr[CPU_DIV_W-2];
+always @(negedge clk) cpu_clk_ctr <= reset ? 0 : cpu_clk_ctr + 1;
 
 // Derive dot clock from memory clock
-always @(posedge clk) dot_clk <= reset ? 1'b0 : ~dot_clk;
+always @(negedge clk) dot_clk <= reset ? 1'b0 : ~dot_clk;
 
 
 // CPU Reset line
@@ -84,11 +86,12 @@ cpu_65c02 cpu(
 
 // Boot ROM
 bootrom rom(
-  .clk(clk),
+  .clk(cpu_mem_clk),
   .addr(cpu_addr[10:0]),
   .data(rom_data)
 );
 
+/*
 // Turn CPU write enable on falling edge of CPU clock into one dot-clock length
 // pulse.
 reg ram_we;
@@ -99,7 +102,6 @@ begin
   prev_cpu_we <= cpu_writing && ~cpu_clk;
 end
 
-/*
 reg mem_clk_reg = 0;
 always @(posedge clk) mem_clk_reg <= ~mem_clk_reg;
 assign mem_clk = mem_clk_reg;
@@ -119,7 +121,7 @@ dpram ram(
   .reset(reset),
   .mem_clk(clk),
 
-  .clk_1(cpu_clk_ctr[1]),
+  .clk_1(cpu_mem_clk),
   .addr_1(cpu_addr),
   .data_in_1(cpu_data_out),
   .data_out_1(ram_data),
