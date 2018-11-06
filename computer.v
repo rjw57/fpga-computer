@@ -49,16 +49,6 @@ always @(negedge clk) dot_clk <= reset ? 1'b0 : ~dot_clk;
 // CPU Reset line
 reset_timer reset_timer(.clk(cpu_clk), .reset(cpu_reset));
 
-/*
-// While the CPU clock is low, keep latching data for next cycle.
-reg [7:0] cpu_data_in_next;
-always @(negedge clk)
-begin
-  if(~cpu_clk)
-    cpu_data_in_next <= (cpu_addr[15:11] == 5'b11111) ? rom_data : ram_data;
-end
-*/
-
 // Latch writes to IO port
 reg [7:0] io_port = 0;
 always @(negedge cpu_clk)
@@ -90,32 +80,6 @@ bootrom rom(
   .addr(cpu_addr[10:0]),
   .data(rom_data)
 );
-
-/*
-// Turn CPU write enable on falling edge of CPU clock into one dot-clock length
-// pulse.
-reg ram_we;
-reg prev_cpu_we;
-always @(negedge clk)
-begin
-  ram_we <= (cpu_writing && ~cpu_clk) && ~prev_cpu_we;
-  prev_cpu_we <= cpu_writing && ~cpu_clk;
-end
-
-reg mem_clk_reg = 0;
-always @(posedge clk) mem_clk_reg <= ~mem_clk_reg;
-assign mem_clk = mem_clk_reg;
-assign dot_clk = ~mem_clk_reg;
-assign vdp_data = 8'hAD;
-
-sram ram(
-  .clk(mem_clk),
-  .addr(cpu_addr),
-  .data_in(cpu_data_out),
-  .data_out(ram_data),
-  .write_enable(ram_we)
-);
-*/
 
 dpram ram(
   .reset(reset),

@@ -20,7 +20,7 @@ wire [9:0] line;
 assign dot = column[2:0];
 assign char = column[9:3];
 
-assign addr = {1'b0, line[7:0], char};
+assign addr = {line[8:0], char};
 
 // RGB332
 assign r = visible ? {data_in[2:0], 1'b0} : 4'h0;
