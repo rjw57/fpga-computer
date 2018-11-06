@@ -21,13 +21,6 @@ assign dot = column[2:0];
 assign char = column[9:3];
 
 assign addr = {1'b0, line[7:0], char};
-//assign addr = 16'h8765;
-
-/*
-assign r = visible ? line[7:4] : 4'h0;
-assign g = visible ? char[3:0] : 4'h0;
-assign b = visible ? {line[3], char[6:4]} : 4'h0;
-*/
 
 // RGB332
 assign r = visible ? {data_in[2:0], 1'b0} : 4'h0;

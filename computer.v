@@ -1,4 +1,5 @@
 module computer(
+  // Memory clock
   input clk,
 
   output [7:0] io_port,
@@ -21,15 +22,12 @@ reg [7:0] cpu_data_in;
 wire [7:0] cpu_data_out;
 wire cpu_writing;
 
-// CPU memory
-wire mem_clk;
-
 // Memory data lines
 wire [7:0] rom_data;
 wire [7:0] ram_data;
 
 // VDP
-wire dot_clk;
+reg dot_clk;
 wire [15:0] vdp_addr;
 wire [7:0] vdp_data;
 
@@ -40,14 +38,16 @@ reset_timer system_reset_timer(.clk(clk), .reset(reset));
 parameter CPU_DIV_W = 3;
 reg [CPU_DIV_W-1:0] cpu_clk_ctr = 0;
 assign cpu_clk = cpu_clk_ctr[CPU_DIV_W-1];
-always @(posedge mem_clk)
-begin
-  cpu_clk_ctr <= cpu_clk_ctr + 1;
-end
+always @(posedge clk) cpu_clk_ctr <= reset ? 0 : cpu_clk_ctr + 1;
+
+// Derive dot clock from memory clock
+always @(posedge clk) dot_clk <= reset ? 1'b0 : ~dot_clk;
+
 
 // CPU Reset line
 reset_timer reset_timer(.clk(cpu_clk), .reset(cpu_reset));
 
+/*
 // While the CPU clock is low, keep latching data for next cycle.
 reg [7:0] cpu_data_in_next;
 always @(negedge clk)
@@ -55,6 +55,7 @@ begin
   if(~cpu_clk)
     cpu_data_in_next <= (cpu_addr[15:11] == 5'b11111) ? rom_data : ram_data;
 end
+*/
 
 // Latch writes to IO port
 reg [7:0] io_port = 0;
@@ -92,12 +93,13 @@ bootrom rom(
 // pulse.
 reg ram_we;
 reg prev_cpu_we;
-always @(negedge mem_clk)
+always @(negedge clk)
 begin
   ram_we <= (cpu_writing && ~cpu_clk) && ~prev_cpu_we;
   prev_cpu_we <= cpu_writing && ~cpu_clk;
 end
 
+/*
 reg mem_clk_reg = 0;
 always @(posedge clk) mem_clk_reg <= ~mem_clk_reg;
 assign mem_clk = mem_clk_reg;
@@ -111,23 +113,22 @@ sram ram(
   .data_out(ram_data),
   .write_enable(ram_we)
 );
+*/
 
-/*
 dpram ram(
   .reset(reset),
-  .clk(clk),
+  .mem_clk(clk),
 
-  .clk_1(mem_clk),
+  .clk_1(cpu_clk_ctr[1]),
   .addr_1(cpu_addr),
   .data_in_1(cpu_data_out),
   .data_out_1(ram_data),
-  .write_enable_1(ram_we),
+  .write_enable_1(cpu_writing),
 
   .clk_2(dot_clk),
-  .addr_2(16'h00d0),
+  .addr_2(vdp_addr),
   .data_out_2(vdp_data)
 );
-*/
 
 vdp vdp(
   .reset(reset),

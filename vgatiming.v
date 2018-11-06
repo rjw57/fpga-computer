@@ -10,14 +10,14 @@ module vgatiming (
 );
 
 parameter H_FRONT_PORCH   = 16;
-parameter H_SYNC_PULSE    = 64;
-parameter H_BACK_PORCH    = 120;
+parameter H_SYNC_PULSE    = 96;
+parameter H_BACK_PORCH    = 48;
 parameter H_VISIBLE       = 640;
 parameter H_SYNC_POSITIVE = 0;
 
-parameter V_FRONT_PORCH   = 1;
-parameter V_SYNC_PULSE    = 3;
-parameter V_BACK_PORCH    = 16;
+parameter V_FRONT_PORCH   = 10;
+parameter V_SYNC_PULSE    = 2;
+parameter V_BACK_PORCH    = 33;
 parameter V_VISIBLE       = 480;
 parameter V_SYNC_POSITIVE = 0;
 
