@@ -15,7 +15,7 @@ module vdp (
 wire [2:0] dot;
 wire [6:0] char;
 wire [9:0] column;
-wire [8:0] line;
+wire [9:0] line;
 
 assign dot = column[2:0];
 assign char = column[9:3];
