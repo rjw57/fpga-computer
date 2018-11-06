@@ -19,43 +19,31 @@ void idle(void);
 
 #define IO_PORT (*((u8*)0x8400))
 
-#define NAME_TABLE ((u8*)0x8000)
-#define TILE_TABLE ((u8*)0xA000)
+#define NAME_TABLE ((u8*)0x6000)
+#define TILE_TABLE ((u8*)0x8000)
 
 void init(void) {
     // enable interrupts
     IRQ_ENABLE();
 
-    //srand(1234);
+    srand(1234);
 
     // loop forever
     while(1) { idle(); }
 }
 
+static u16 name_addr = 0, tile_addr = 0;
 void delay(void) {
     u16 i = 0x2000;
-    //u16 i = 0x20;
-    while(i) { --i; }
+    while(i) {
+        --i;
+        NAME_TABLE[name_addr & 0x0FFF] = rand();
+        ++name_addr;
+    }
 }
 
 static u8 ctr = 0;
-static u16 name_addr = 0, tile_addr = 0;
 void idle(void) {
-    //delay();
     IO_PORT = ++ctr;
     delay();
-    return;
-
-    NAME_TABLE[(name_addr<<1)] = rand();
-    NAME_TABLE[(name_addr<<1)+1] = rand();
-    /*
-    NAME_TABLE[(name_addr<<1)+1] = rand();
-    TILE_TABLE[(tile_addr<<1)] = rand();
-    TILE_TABLE[(tile_addr<<1)+1] = rand();
-    */
-    tile_addr = (tile_addr + 1) & 0x07ff;
-
-    if(name_addr != 0x0fff) {
-        name_addr = (name_addr + 1) & 0x0fff;
-    }
 }
