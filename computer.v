@@ -11,6 +11,8 @@ module computer(
   output vsync
 );
 
+parameter BOOTROM_SOURCE = "bootrom.hex";
+
 // System lines
 wire reset;
 
@@ -39,7 +41,7 @@ reset_timer system_reset_timer(.clk(clk), .reset(reset));
 parameter CPU_DIV_W = 3;
 reg [CPU_DIV_W-1:0] cpu_clk_ctr = 0;
 assign cpu_clk = cpu_clk_ctr[CPU_DIV_W-1];
-assign cpu_mem_clk = cpu_clk_ctr[CPU_DIV_W-2];
+assign cpu_mem_clk = cpu_clk_ctr[0];
 always @(negedge clk) cpu_clk_ctr <= reset ? 0 : cpu_clk_ctr + 1;
 
 // Derive dot clock from memory clock
@@ -75,7 +77,7 @@ cpu_65c02 cpu(
 );
 
 // Boot ROM
-bootrom rom(
+bootrom #(.SOURCE(BOOTROM_SOURCE)) rom(
   .clk(cpu_mem_clk),
   .addr(cpu_addr[10:0]),
   .data(rom_data)

@@ -18,7 +18,7 @@ wire clk;
 // Construct video dot clock
 pll pll(.clock_in(CLOCK_12M), .clock_out(clk));
 
-computer computer(
+computer #(.BOOTROM_SOURCE("bootrom.placeholder.hex")) computer(
   .clk(clk),
   .io_port(io_port),
   .r(R), .g(G), .b(B),
