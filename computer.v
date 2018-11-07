@@ -41,11 +41,11 @@ reset_timer system_reset_timer(.clk(clk), .reset(reset));
 parameter CPU_DIV_W = 3;
 reg [CPU_DIV_W-1:0] cpu_clk_ctr = 0;
 assign cpu_clk = cpu_clk_ctr[CPU_DIV_W-1];
-assign cpu_mem_clk = cpu_clk_ctr[0];
-always @(negedge clk) cpu_clk_ctr <= reset ? 0 : cpu_clk_ctr + 1;
+assign cpu_mem_clk = cpu_clk_ctr[CPU_DIV_W-2];
+always @(posedge clk) cpu_clk_ctr <= reset ? 0 : cpu_clk_ctr + 1;
 
 // Derive dot clock from memory clock
-always @(negedge clk) dot_clk <= reset ? 1'b0 : ~dot_clk;
+always @(posedge clk) dot_clk <= reset ? 1'b0 : ~dot_clk;
 
 
 // CPU Reset line
