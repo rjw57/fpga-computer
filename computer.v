@@ -47,7 +47,6 @@ always @(posedge clk) cpu_clk_ctr <= reset ? 0 : cpu_clk_ctr + 1;
 // Derive dot clock from memory clock
 always @(posedge clk) dot_clk <= reset ? 1'b0 : ~dot_clk;
 
-
 // CPU Reset line
 reset_timer reset_timer(.clk(cpu_clk), .reset(cpu_reset));
 
@@ -58,9 +57,13 @@ begin
   if(cpu_writing && cpu_addr == 16'h8400) io_port <= cpu_data_out;
 end
 
+reg rom_select;
+always @(negedge cpu_clk)
+  rom_select <= cpu_addr[15:11] == 5'b11111;
+
 // Latch CPU data in line on rising edge of CPU clock
 always @(posedge cpu_clk)
-  cpu_data_in <= (cpu_addr[15:11] == 5'b11111) ? rom_data : ram_data;
+  cpu_data_in <= rom_select ? rom_data : ram_data;
 
 cpu_65c02 cpu(
   .reset(reset || cpu_reset),
@@ -83,6 +86,15 @@ bootrom #(.SOURCE(BOOTROM_SOURCE)) rom(
   .data(rom_data)
 );
 
+sram ram(
+  .clk(cpu_mem_clk),
+  .addr(cpu_addr),
+  .data_in(cpu_data_out),
+  .write_enable(cpu_writing),
+  .data_out(ram_data)
+);
+
+/*
 dpram ram(
   .reset(reset),
   .mem_clk(clk),
@@ -97,13 +109,11 @@ dpram ram(
   .addr_2(vdp_addr),
   .data_out_2(vdp_data)
 );
+*/
 
 vdp vdp(
   .reset(reset),
-
   .clk(dot_clk),
-  .addr(vdp_addr),
-  .data_in(vdp_data),
 
   .r(r), .g(g), .b(b), .hsync(hsync), .vsync(vsync)
 );

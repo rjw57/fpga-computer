@@ -1,9 +1,9 @@
 `timescale 1ns/10ps
 
 module testbench;
-  // 50.25 ~= 2 * 21.125MHz clock
+  // 31.5MHz clock
   reg clk;
-  always #(1000.0 / 50.25) clk = (clk === 1'b0);
+  always #(1000.0 / (31.5*2)) clk = (clk === 1'b0);
 
   computer computer(
     .clk(clk)
