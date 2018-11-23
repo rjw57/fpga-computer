@@ -1,9 +1,10 @@
 `timescale 1ns/10ps
+`define NO_BOOTROM_PLACEHOLDER
 
 module testbench;
-  // 31.5MHz clock
-  reg clk;
-  always #(1000.0 / (31.5*2)) clk = (clk === 1'b0);
+  // 63MHz clock
+  reg clk = 1;
+  always #(1000.0 / (63*2)) clk = ~clk;
 
   computer computer(
     .clk(clk)

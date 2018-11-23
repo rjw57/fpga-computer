@@ -15,15 +15,15 @@ module sram(
 wire [7:0] bank_1_out;
 wire [7:0] bank_2_out;
 reg bank_select;
-reg previous_bank_select;
+reg [7:0] data_out;
 
 always @(posedge clk)
 begin
   bank_select <= addr[15];
-  previous_bank_select <= bank_select;
+  data_out <= bank_select ? bank_2_out : bank_1_out;
 end
 
-assign data_out = previous_bank_select ? bank_2_out : bank_1_out;
+//assign data_out = previous_bank_select ? bank_2_out : bank_1_out;
 
 spram32k8 bank_1(
   .clk(clk),

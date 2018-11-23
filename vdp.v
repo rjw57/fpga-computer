@@ -1,6 +1,7 @@
 module vdp (
   input reset,
   input clk,
+  input dot_clk,
 
   output [3:0] r,
   output [3:0] g,
@@ -9,80 +10,32 @@ module vdp (
   output vsync
 );
 
-reg hsync;
-reg vsync;
-reg visible;
+reg out_visible;
+reg [3:0] out_red;
+reg [3:0] out_green;
+reg [3:0] out_blue;
+reg out_hsync;
+reg out_vsync;
 
-wire [2:0] dot;
-wire [6:0] char;
-wire [9:0] column;
-wire [9:0] line;
+assign r = out_visible ? out_red : 4'h0;
+assign g = out_visible ? out_green : 4'h0;
+assign b = out_visible ? out_blue : 4'h0;
+assign hsync = out_hsync;
+assign vsync = out_vsync;
 
 wire dot_hsync;
 wire dot_vsync;
 wire dot_visible;
 
-reg [15:0] addr;
-wire [7:0] vram_data;
-
-wire char_clk = ~dot[2];
-reg char_hsync;
-reg char_vsync;
-reg char_visible;
-
-reg [7:0] next_char_data;
-
-reg [7:0] char_data;
-
-assign dot = column[2:0];
-assign char = column[9:3];
-
-/*
-// RGB332
-assign r = visible ? {char_data[2:0], 1'b0} : 4'h0;
-assign g = visible ? {char_data[5:3], 1'b0} : 4'h0;
-assign b = visible ? {char_data[7:6], 2'b0} : 4'h0;
-*/
-
-wire px = char_data[dot];
-assign r = visible ? (px ? 4'hF : 4'h0) : 4'h0;
-assign g = visible ? (px ? 4'hF : 4'h0) : 4'h0;
-assign b = visible ? (px ? 4'hF : 4'h0) : 4'h0;
-
-always @(posedge char_clk)
-begin
-  hsync <= char_hsync;
-  vsync <= char_vsync;
-  visible <= char_visible;
-  char_data <= next_char_data;
-end
-
-always @(posedge clk)
-begin
-  case (dot)
-    3'h0:
-      begin
-        char_hsync <= dot_hsync;
-        char_vsync <= dot_vsync;
-        char_visible <= dot_visible;
-        addr <= {4'h0, line[8:4], char} + 16'h6000;
-      end
-    3'h2:
-      begin
-        addr <= {5'h0, vram_data, line[3:1]} + 16'h3000;
-      end
-    3'h4:
-      begin
-        next_char_data <= vram_data;
-      end
-  endcase
-end
+wire [2:0] dot;
+wire [6:0] char;
+wire [9:0] line;
 
 vgatiming timing(
-  .dot_clk(clk),
+  .dot_clk(dot_clk),
   .reset(reset),
 
-  .column(column),
+  .column({char, dot}),
   .line(line),
 
   .visible(dot_visible),
@@ -90,11 +43,28 @@ vgatiming timing(
   .vsync(dot_vsync)
 );
 
-sram ram(
-  .clk(dot_clk),
-  .addr(addr),
+reg [14:0] vram_addr;
+wire [7:0] vram_data;
+
+spram32k8 ram(
+  .clk(clk),
+  .addr(vram_addr),
   .write_enable(1'b0),
   .data_out(vram_data)
 );
+
+always @(posedge clk)
+  if(reset) vram_addr <= 14'h0;
+
+always @(posedge dot_clk)
+begin
+  out_visible <= dot_visible;
+  out_hsync <= dot_hsync;
+  out_vsync <= dot_vsync;
+
+  out_red = {dot, 1'b0};
+  out_green = char[3:0];
+  out_blue = line[3:0];
+end
 
 endmodule

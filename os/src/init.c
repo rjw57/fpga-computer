@@ -19,10 +19,11 @@ void idle(void);
 
 #define IO_PORT (*((u8*)0x8400))
 
-#define NAME_TABLE ((u8*)0x6000)
-#define TILE_TABLE ((u8*)0x8000)
+#define NAME_TABLE ((u8*)0x8000)
 
 void init(void) {
+    IO_PORT = 0xff;
+
     // enable interrupts
     IRQ_ENABLE();
 
@@ -37,7 +38,8 @@ void delay(void) {
     u16 i = 0x2000;
     while(i) {
         --i;
-        NAME_TABLE[name_addr & 0x0FFF] = rand();
+        NAME_TABLE[20] = rand();
+        //NAME_TABLE[name_addr & 0x0FFF] = rand();
         ++name_addr;
     }
 }
