@@ -63,8 +63,10 @@ end
 // Latch CPU data in line on rising edge of CPU clock
 always @(posedge cpu_clk)
 begin
-  if(cpu_addr[15:11] == 5'b11111)
+  if(cpu_addr[15:11] == 5'b11111) // $F800-FFFF
     cpu_data_in <= rom_data;
+  else if(vdp_select)
+    cpu_data_in <= vdp_data_out_reg;
   else
     cpu_data_in <= ram_data;
 end
@@ -98,10 +100,25 @@ spram32k8 ram_bank_1(
   .data_out(ram_data)
 );
 
+wire vdp_select = cpu_addr[15:2] == 14'b1111_0111_1111_11; // $F7FC-$F7FF
+wire vdp_write = cpu_writing && ~cpu_clk && vdp_select;
+wire vdp_read = ~cpu_writing && ~cpu_clk && vdp_select;
+wire [7:0] vdp_data_out;
+reg [7:0] vdp_data_out_reg;
+
+always @(posedge clk)
+  if(vdp_read) vdp_data_out_reg <= vdp_data_out;
+
 vdp vdp(
   .reset(reset),
   .clk(clk),
   .dot_clk(dot_clk),
+
+  .mode(cpu_addr[1:0]),
+  .read(vdp_read),
+  .write(vdp_write),
+  .data_in(cpu_data_out),
+  .data_out(vdp_data_out),
 
   .r(r), .g(g), .b(b), .hsync(hsync), .vsync(vsync)
 );
