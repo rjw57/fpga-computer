@@ -17,7 +17,6 @@ wire reset;
 // CPU Bus
 wire cpu_reset;
 wire cpu_clk;
-wire cpu_mem_clk;
 wire [15:0] cpu_addr;
 reg [7:0] cpu_data_in;
 wire [7:0] cpu_data_out;
@@ -28,7 +27,6 @@ wire [7:0] rom_data;
 wire [7:0] ram_data;
 
 // VDP
-reg dot_clk;
 wire [15:0] vdp_addr;
 wire [7:0] vdp_data;
 
@@ -40,12 +38,7 @@ parameter CPU_DIV_W = 4; // divide by 16
 reg [CPU_DIV_W-1:0] cpu_clk_ctr = 0;
 assign cpu_clk = cpu_clk_ctr[CPU_DIV_W-1];
 assign cpu_mem_clk = cpu_clk_ctr[CPU_DIV_W-2];
-always @(posedge clk)
-  cpu_clk_ctr <= reset ? 0 : cpu_clk_ctr + 1;
-
-// Derive dot clock from memory clock
-always @(posedge clk)
-  dot_clk <= reset ? 1'b0 : ~dot_clk;
+always @(posedge clk) cpu_clk_ctr = cpu_clk_ctr + 1;
 
 // CPU Reset line
 reset_timer reset_timer(.clk(cpu_clk), .reset(cpu_reset));
@@ -112,7 +105,6 @@ always @(posedge clk)
 vdp vdp(
   .reset(reset),
   .clk(clk),
-  .dot_clk(dot_clk),
 
   .mode(cpu_addr[1:0]),
   .read(vdp_read),
