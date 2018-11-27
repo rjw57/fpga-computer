@@ -56,7 +56,7 @@ end
 // Latch CPU data in line on rising edge of CPU clock
 always @(posedge cpu_clk)
 begin
-  if(cpu_addr[15:11] == 5'b11111) // $F800-FFFF
+  if(cpu_addr[15:13] == 3'b111) // $F800-FFFF
     cpu_data_in <= rom_data;
   else if(vdp_select)
     cpu_data_in <= vdp_data_out_reg;
@@ -81,7 +81,7 @@ cpu_65c02 cpu(
 // Boot ROM
 bootrom rom(
   .clk(clk),
-  .addr(cpu_addr[10:0]),
+  .addr(cpu_addr[12:0]),
   .data(rom_data)
 );
 
@@ -93,7 +93,7 @@ spram32k8 ram_bank_1(
   .data_out(ram_data)
 );
 
-wire vdp_select = cpu_addr[15:2] == 14'b1111_0111_1111_11; // $F7FC-$F7FF
+wire vdp_select = cpu_addr[15:8] == 8'b1100_0000; // $C000-$C0FF
 wire vdp_write = cpu_writing && ~cpu_clk && vdp_select;
 wire vdp_read = ~cpu_writing && ~cpu_clk && vdp_select;
 wire [7:0] vdp_data_out;

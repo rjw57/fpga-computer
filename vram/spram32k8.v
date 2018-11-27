@@ -11,19 +11,17 @@ module spram32k8(
   output [7:0] data_out
 );
   reg byte_select_reg;
-  reg [7:0] data_out;
 
   wire [15:0] spram_datain = {data_in, data_in};
   wire [3:0] spram_maskwren = (addr[0] == 1'b1) ? 4'b1100 : 4'b0011;
   wire [15:0] spram_dataout;
 
+  assign data_out = byte_select_reg ? spram_dataout[15:8] : spram_dataout[7:0];
+
   always @(posedge clk)
   begin
-    // Latch input lines at +ve clock
-    byte_select_reg <= addr[0];
-
-    // Latch output for previous address
-    data_out <= byte_select_reg ? spram_dataout[15:8] : spram_dataout[7:0];
+    // Latch byte select at clock edge
+    byte_select_reg = addr[0];
   end
 
   // ICE40 SPRAM behavior, at +ve clock edge, data read at address is latched

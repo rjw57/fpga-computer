@@ -76,6 +76,7 @@ reg vram_write_requested_prev;
 
 // VRAM interface
 reg [15:0] vram_address;
+reg [15:0] vram_address_base;
 reg vram_write_enable;
 wire [7:0] vram_data_out;
 
@@ -89,50 +90,47 @@ always @(posedge clk) dot_clk = reset ? 1'b0 : ~dot_clk;
 
 // CPU <-> registers and VRAM memory
 always @(posedge clk) begin
+  // A requested write was completed
+  if(~vram_write_enable && vram_write_enable_prev) begin
+    vram_write_requested = 1'b0;
+    {register_file[1], register_file[0]} = vram_write_address + 1;
+  end
+
+  // Falling edge of read from VRAM
+  if(~read && read_prev && (mode_prev == 2'b10)) begin
+    {register_file[3], register_file[2]} = vram_read_address + 1;
+  end
+
+  // Falling edge of write
+  if(~write && write_prev) begin
+    case(mode_prev)
+      // Register select
+      2'b00: reg_select = data_in_prev;
+
+      // Write register
+      2'b01: register_file[reg_select] = data_in_prev;
+
+      // Write data
+      2'b10: begin
+        vram_write_data = data_in_prev;
+        vram_write_requested = 1'b1;
+      end
+    endcase
+  end
+
+  mode_prev = mode;
+  data_in_prev = data_in;
+  read_prev = read;
+  write_prev = write;
+  vram_write_enable_prev = vram_write_enable;
+  vram_write_requested_prev = vram_write_requested;
+
   if(reset) begin
-    {register_file[1], register_file[0]} <= 16'h0000;
-    {register_file[3], register_file[2]} <= 16'h0000;
-    {register_file[5], register_file[4]} <= 16'h0000;
-    {register_file[7], register_file[6]} <= 16'h1000;
-    {register_file[9], register_file[8]} <= 16'h2000;
-  end else begin
-    mode_prev <= mode;
-    data_in_prev <= data_in;
-    read_prev <= read;
-    write_prev <= write;
-    vram_write_enable_prev <= vram_write_enable;
-    vram_write_requested_prev <= vram_write_requested;
-
-    // A requested write was completed
-    if(~vram_write_enable && vram_write_enable_prev && vram_write_requested) begin
-      vram_write_requested <= 1'b0;
-    end
-
-    if(~vram_write_requested && vram_write_requested_prev) begin
-      {register_file[1], register_file[0]} <= vram_write_address + 1;
-    end
-
-    // Falling edge of read from VRAM
-    if(~read && read_prev && (mode_prev == 2'b10)) begin
-      {register_file[3], register_file[2]} <= vram_read_address + 1;
-    end
-
-    // Falling edge of write
-    if(~write && write_prev) begin
-      case(mode_prev)
-        // Register select
-        2'b00: reg_select <= data_in_prev;
-
-        // Write register
-        2'b01: register_file[reg_select] <= data_in_prev;
-
-        // Write data
-        2'b10: begin
-          vram_write_data <= data_in_prev;
-          vram_write_requested <= 1'b1;
-        end
-      endcase
-    end
+    {register_file[1], register_file[0]} = 16'h0000;
+    {register_file[3], register_file[2]} = 16'h0000;
+    {register_file[5], register_file[4]} = 16'h0000;
+    {register_file[7], register_file[6]} = 16'h1000;
+    {register_file[9], register_file[8]} = 16'h2000;
   end
 end
 
@@ -202,64 +200,65 @@ reg [3:0] out_tile_bg_colour;
 reg [7:0] out_tile_pattern;
 
 always @(posedge dot_clk) begin
-  tile_state <= tile_state + 1;
+  vram_write_enable = 1'b0;
+  vram_address = 16'h0;
+  vram_address_base = 16'h0;
+
+  out_tile_pattern = {out_tile_pattern[6:0], 1'b0};
 
   case(tile_state)
     3'h0: begin
       // Prepare tile name read
-      vram_address <= {4'b0, v_ctr[8:4], h_ctr[9:3]};
-      vram_write_enable <= 1'b0;
+      vram_address = {4'b0, v_ctr[8:4], h_ctr[9:3]};
+      vram_address_base = name_table_base;
     end
 
     3'h1: begin
-      // Use tile name to look up pattern based on line
-      vram_address <= {5'b0, vram_data_out, v_ctr[3:1]};
-      vram_write_enable <= 1'b0;
-      tile_name <= vram_data_out;
+      tile_name = vram_data_out;
+
+      // Look up tile colour
+      vram_address = {4'b0, v_ctr[8:4], h_ctr[9:3]};
+      vram_address_base = colour_table_base;
     end
 
     3'h2: begin
-      // Use tile name to look up colour table
-      vram_address <= {8'h0, tile_name};
-      vram_write_enable <= 1'b0;
-      tile_pattern <= vram_data_out;
+      {tile_bg_colour, tile_fg_colour} = vram_data_out;
+
+      // Use tile name to look up pattern based on line
+      vram_address = {5'b0, tile_name, v_ctr[3:1]};
+      vram_address_base = pattern_table_base;
     end
 
     3'h3: begin
-      {tile_bg_colour, tile_fg_colour} <= vram_data_out;
+      tile_pattern = vram_data_out;
 
-      vram_address <= 16'h0;
-      vram_write_enable <= 1'b0;
+      // Prepare CPU read
+      vram_address = vram_read_address;
     end
 
     3'h4: begin
-      // Prepare CPU read
-      vram_address <= vram_read_address;
-      vram_write_enable <= 1'b0;
-    end
-
-    3'h5: begin
       // Latch input data
-      vram_read_data <= vram_data_out;
+      vram_read_data = vram_data_out;
 
       // Prepare CPU write
-      vram_address <= vram_write_address;
-      vram_write_enable <= vram_write_requested;
+      vram_address = vram_write_address;
+      vram_write_enable = vram_write_requested;
     end
 
-    default: begin
-      vram_address <= 16'h0;
-      vram_write_enable <= 1'b0;
+    3'h7: begin
+      out_tile_pattern = tile_pattern;
+      out_tile_fg_colour = tile_fg_colour;
+      out_tile_bg_colour = tile_bg_colour;
     end
   endcase
 
-  // Shift/load pattern
-  if(tile_state == 3'h7) begin
-    out_tile_pattern <= tile_pattern;
-    out_tile_fg_colour <= tile_fg_colour;
-    out_tile_bg_colour <= tile_bg_colour;
-  end else
-    out_tile_pattern <= {out_tile_pattern[6:0], 1'b0};
+  tile_state = tile_state + 1;
+
+  if(reset) begin
+    vram_address = 16'h0000;
+    vram_write_enable = 1'b0;
+    vram_address_base = 16'h0000;
+  end
 end
 
 wire [3:0] out_tile_fg_r = out_tile_fg_colour[0] ? 4'hf : 4'h0;
@@ -284,8 +283,8 @@ assign b = visible ? (out_tile_pattern[7] ? out_tile_fg_b : out_tile_bg_b) : 4'h
 // RAM clock is inverse of system clock to allow VRAM address/data lines to
 // settle.
 spram32k8 ram(
-  .clk(~clk),
-  .addr(vram_address[14:0]),
+  .clk(~dot_clk),
+  .addr(vram_address[14:0] + vram_address_base[14:0]),
   .write_enable(vram_write_enable),
   .data_in(vram_write_data),
   .data_out(vram_data_out)

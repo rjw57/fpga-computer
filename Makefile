@@ -50,7 +50,7 @@ bootrom.hex: os/rom.bin
 	hexdump -v -e '/1 "%02x\n"' >"$@" <"$<"
 
 bootrom.placeholder.hex:
-	icebram -g -s 1234 8 2048 >"$@"
+	icebram -g -s 1234 8 8192 >"$@"
 
 %.blif: $(SOURCES) $(HW_EXTRA_SOURCES)
 	yosys -p 'synth_ice40 -top top -blif $@' $(filter %.v, $^)
