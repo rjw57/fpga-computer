@@ -35,6 +35,7 @@ void idle(void);
 #define VDP_PATTERN_TABLE_BASE_H 0x09
 
 void copy_font(void);
+void clear_colour(void);
 
 void init(void) {
     IO_PORT = 0xff;
@@ -43,6 +44,7 @@ void init(void) {
     IRQ_ENABLE();
 
     copy_font();
+    clear_colour();
 
     VDP_REGISTER_SELECT = VDP_REG_WRITE_ADDR_L;
     VDP_REGISTER_DATA = 0x00;
@@ -58,6 +60,19 @@ void init(void) {
 
     // loop forever
     while(1) { idle(); }
+}
+
+void clear_colour(void) {
+    u16 i;
+
+    VDP_REGISTER_SELECT = VDP_REG_WRITE_ADDR_L;
+    VDP_REGISTER_DATA = 0x00;
+    VDP_REGISTER_SELECT = VDP_REG_WRITE_ADDR_H;
+    VDP_REGISTER_DATA = 0x10;
+
+    for(i=0; i<4096; i++) {
+        VDP_VRAM_DATA = 0x0f & rand();
+    }
 }
 
 void copy_font(void) {
@@ -86,7 +101,7 @@ void delay(void) {
 static u16 ctr = 0;
 void idle(void) {
     IO_PORT = (u8)(++ctr);
-    if(ctr == 0x2000) {
+    if(ctr == 0x1000) {
         ctr = 0;
         VDP_REGISTER_SELECT = VDP_REG_WRITE_ADDR_L;
         VDP_REGISTER_DATA = 0x00;
