@@ -10,24 +10,16 @@ ICEPROG = iceprog
 
 CPU_SOURCES = cpu/ALU.v cpu/cpu_65c02.v
 #CPU_SOURCES = bc6502/bc6502.v bc6502/addsub.v
-VRAM_SOURCES = vram/vram.v vram/spram32k8.v vram/sram.v
 
 SOURCES = \
 	$(CPU_SOURCES) \
-	$(VRAM_SOURCES) \
 	bootrom.v \
 	bootrom.placeholder.hex \
 	computer.v \
-	dpram.v \
-	io.v \
-	nameram.v \
-	nameram.hex \
 	reset_timer.v \
-	tileram.v \
-	tileram.hex \
+	spram32k8.v \
 	top.v \
-	vdp.v \
-	vgatiming.v
+	vdp.v
 
 HW_EXTRA_SOURCES = hw/pll.v hw/led.v
 
@@ -37,7 +29,7 @@ all: $(PROJ).bin
 
 .PHONY: all
 
-sim: vram_tb.vcd bc6502/bc6502_tb.vcd
+sim: bc6502/bc6502_tb.vcd
 
 .PHONY: sim
 
