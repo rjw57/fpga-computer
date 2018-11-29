@@ -54,7 +54,7 @@ void init(void) {
     VDP_REGISTER_SELECT = VDP_REG_READ_ADDR_L;
     VDP_REGISTER_DATA = 0x00;
     VDP_REGISTER_SELECT = VDP_REG_READ_ADDR_H;
-    VDP_REGISTER_DATA = 0x00;
+    VDP_REGISTER_DATA = 0x01;
 
     srand(1234);
 
@@ -91,16 +91,17 @@ void copy_font(void) {
 
 static u16 name_addr = 0, tile_addr = 0;
 void delay(void) {
-    u16 i = 0x8000;
+    u16 i = 0x0800;
     while(i) {
         --i;
         ++name_addr;
     }
 }
 
-static u16 ctr = 0;
+static u16 ctr = 0, ctr2 = 0;
 void idle(void) {
     IO_PORT = (u8)(++ctr);
+    ++ctr2;
 
     if(ctr == 0x1000) {
         ctr = 0;
@@ -108,9 +109,15 @@ void idle(void) {
         VDP_REGISTER_DATA = 0x00;
         VDP_REGISTER_SELECT = VDP_REG_WRITE_ADDR_H;
         VDP_REGISTER_DATA = 0x00;
+
+        VDP_REGISTER_SELECT = VDP_REG_READ_ADDR_L;
+        VDP_REGISTER_DATA = 0x00;
+        VDP_REGISTER_SELECT = VDP_REG_READ_ADDR_H;
+        VDP_REGISTER_DATA = 0x01;
     }
 
-    VDP_VRAM_DATA = rand();
+    VDP_VRAM_DATA = rand() + ctr2;
+    //VDP_VRAM_DATA = VDP_VRAM_DATA;
 
     /*
     if(ctr == 0x1000) {
@@ -122,6 +129,6 @@ void idle(void) {
     }
     VDP_VRAM_DATA = ((ctr & 0x1000) ? 0x0f : 0xff) & rand();
     //VDP_VRAM_DATA = VDP_VRAM_DATA;
-    delay();
     */
+    //delay();
 }

@@ -193,6 +193,9 @@ end
 reg [2:0] tile_state;
 reg [7:0] tile_name;
 reg [7:0] tile_pattern;
+reg tile_flip_v;
+reg tile_flip_h;
+reg [5:0] tile_attribute;
 reg [3:0] tile_fg_colour;
 reg [3:0] tile_bg_colour;
 
@@ -201,10 +204,10 @@ reg [3:0] out_tile_bg_colour;
 reg [7:0] out_tile_pattern;
 
 always @(posedge dot_clk) begin
+  // Default behaviour: innocuous read from VRAM and shift output pattern.
   vram_write_enable = 1'b0;
   vram_address = 16'h0;
   vram_address_base = 16'h0;
-
   out_tile_pattern = {out_tile_pattern[6:0], 1'b0};
 
   case(tile_state)
@@ -215,15 +218,18 @@ always @(posedge dot_clk) begin
     end
 
     3'h1: begin
-      tile_name = vram_data_out;
+      // Latch tile name.
+      tile_name <= vram_data_out;
 
-      // Look up tile colour
+      // Look up tile attributes.
       vram_address = {4'b0, v_ctr[8:4], h_ctr[9:3]};
       vram_address_base = colour_table_base;
     end
 
     3'h2: begin
-      {tile_bg_colour, tile_fg_colour} = vram_data_out;
+      // Latch tile attributes
+      {tile_flip_v, tile_flip_h, tile_attribute} <= vram_data_out;
+      {tile_bg_colour, tile_fg_colour} <= vram_data_out;
 
       // Use tile name to look up pattern based on line
       vram_address = {5'b0, tile_name, v_ctr[3:1]};
@@ -231,25 +237,27 @@ always @(posedge dot_clk) begin
     end
 
     3'h3: begin
-      tile_pattern = vram_data_out;
+      // Latch tile pattern.
+      tile_pattern <= vram_data_out;
+    end
 
+    3'h6: begin
       // Prepare CPU read
       vram_address = vram_read_address;
     end
 
-    3'h4: begin
-      // Latch input data
-      vram_read_data = vram_data_out;
+    3'h7: begin
+      // Latch CPU data
+      vram_read_data <= vram_data_out;
+
+      // Latch next tile pattern, etc.
+      out_tile_pattern = tile_pattern;
+      out_tile_fg_colour = tile_fg_colour;
+      out_tile_bg_colour = tile_bg_colour;
 
       // Prepare CPU write
       vram_address = vram_write_address;
       vram_write_enable = vram_write_requested;
-    end
-
-    3'h7: begin
-      out_tile_pattern = tile_pattern;
-      out_tile_fg_colour = tile_fg_colour;
-      out_tile_bg_colour = tile_bg_colour;
     end
   endcase
 
