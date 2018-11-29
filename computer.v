@@ -17,7 +17,6 @@ wire reset;
 wire cpu_clk;
 wire [15:0] cpu_addr;
 reg [7:0] cpu_data_in;
-reg [7:0] cpu_data_in_next;
 wire [7:0] cpu_data_out;
 wire cpu_writing;
 
@@ -27,7 +26,6 @@ wire [7:0] ram_data;
 
 // VDP
 wire [15:0] vdp_addr;
-wire [7:0] vdp_data;
 wire [7:0] vdp_data_out;
 reg [7:0] vdp_data_out_reg;
 
@@ -50,11 +48,11 @@ cpu_clock_generator cpu_clock_generator(.clk(clk), .cpu_clk(cpu_clk));
 always @(posedge cpu_clk)
 begin
   if(rom_select)
-    cpu_data_in = rom_data;
+    cpu_data_in <= rom_data;
   else if(vdp_select)
-    cpu_data_in = vdp_data_out_reg;
+    cpu_data_in <= vdp_data_out_reg;
   else
-    cpu_data_in = ram_data;
+    cpu_data_in <= ram_data;
 end
 
 // The CPU itself.
@@ -88,14 +86,16 @@ spram32k8 ram_bank_1(
 );
 
 // Latch writes to IO port.
-always @(posedge clk)
-begin
-  if(~cpu_clk && cpu_writing && io_select)
-    io_port = cpu_data_out;
-
-  if(reset)
-    io_port = 8'b0;
+always @(posedge clk) begin
+  if(reset) begin
+    io_port <= 8'h00;
+  end else if(~cpu_clk && cpu_writing && io_select) begin
+    io_port <= cpu_data_out;
+  end
 end
+
+wire vdp_read = ~cpu_writing && ~cpu_clk && vdp_select;
+wire vdp_write = cpu_writing && ~cpu_clk && vdp_select;
 
 always @(posedge clk)
   if(vdp_read) vdp_data_out_reg = vdp_data_out;
@@ -105,8 +105,8 @@ vdp vdp(
   .clk(clk),
 
   .mode(cpu_addr[1:0]),
-  .read(~cpu_writing && ~cpu_clk && vdp_select),
-  .write(cpu_writing && ~cpu_clk && vdp_select),
+  .read(vdp_read),
+  .write(vdp_write),
   .data_in(cpu_data_out),
   .data_out(vdp_data_out),
 
