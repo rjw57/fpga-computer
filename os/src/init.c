@@ -29,13 +29,16 @@ void idle(void);
 #define VDP_REG_READ_ADDR_H 0x03
 #define VDP_NAME_TABLE_BASE_L 0x04
 #define VDP_NAME_TABLE_BASE_H 0x05
-#define VDP_COLOUR_TABLE_BASE_L 0x06
-#define VDP_COLOUR_TABLE_BASE_H 0x07
+#define VDP_ATTRIBUTE_TABLE_BASE_L 0x06
+#define VDP_ATTRIBUTE_TABLE_BASE_H 0x07
 #define VDP_PATTERN_TABLE_BASE_L 0x08
 #define VDP_PATTERN_TABLE_BASE_H 0x09
+#define VDP_PALETTE_TABLE_BASE_L 0x0A
+#define VDP_PALETTE_TABLE_BASE_H 0x0B
 
 void copy_font(void);
-void clear_colour(void);
+void clear_attribute(void);
+void clear_palette(void);
 
 void init(void) {
     IO_PORT = 0xff;
@@ -44,7 +47,8 @@ void init(void) {
     IRQ_ENABLE();
 
     copy_font();
-    clear_colour();
+    clear_attribute();
+    clear_palette();
 
     VDP_REGISTER_SELECT = VDP_REG_WRITE_ADDR_L;
     VDP_REGISTER_DATA = 0x00;
@@ -62,7 +66,7 @@ void init(void) {
     while(1) { idle(); }
 }
 
-void clear_colour(void) {
+void clear_attribute(void) {
     u16 i;
 
     VDP_REGISTER_SELECT = VDP_REG_WRITE_ADDR_L;
@@ -71,7 +75,21 @@ void clear_colour(void) {
     VDP_REGISTER_DATA = 0x10;
 
     for(i=0; i<4096; i++) {
-        VDP_VRAM_DATA = 0x0f & rand();
+        VDP_VRAM_DATA = rand();
+    }
+}
+
+void clear_palette(void) {
+    u16 i;
+
+    VDP_REGISTER_SELECT = VDP_REG_WRITE_ADDR_L;
+    VDP_REGISTER_DATA = 0x00;
+    VDP_REGISTER_SELECT = VDP_REG_WRITE_ADDR_H;
+    VDP_REGISTER_DATA = 0x28;
+
+    for(i=0; i<64; i++) {
+        VDP_VRAM_DATA = rand();
+        VDP_VRAM_DATA = 0x00;
     }
 }
 
@@ -103,7 +121,7 @@ void idle(void) {
     IO_PORT = (u8)(++ctr);
     ++ctr2;
 
-    if(ctr == 0x1000) {
+    if(ctr == 0x2000) {
         ctr = 0;
         VDP_REGISTER_SELECT = VDP_REG_WRITE_ADDR_L;
         VDP_REGISTER_DATA = 0x00;
@@ -111,12 +129,13 @@ void idle(void) {
         VDP_REGISTER_DATA = 0x00;
 
         VDP_REGISTER_SELECT = VDP_REG_READ_ADDR_L;
-        VDP_REGISTER_DATA = 0x00;
-        VDP_REGISTER_SELECT = VDP_REG_READ_ADDR_H;
         VDP_REGISTER_DATA = 0x01;
+        VDP_REGISTER_SELECT = VDP_REG_READ_ADDR_H;
+        VDP_REGISTER_DATA = 0x00;
     }
 
-    VDP_VRAM_DATA = rand() + ctr2;
+    VDP_VRAM_DATA = rand();
+    //VDP_VRAM_DATA = ctr;
     //VDP_VRAM_DATA = VDP_VRAM_DATA;
 
     /*

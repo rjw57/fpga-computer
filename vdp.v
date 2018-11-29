@@ -44,8 +44,9 @@ reg [7:0] register_file [REGISTER_COUNT-1:0];
 wire [15:0] vram_write_address = {register_file[1], register_file[0]};
 wire [15:0] vram_read_address = {register_file[3], register_file[2]};
 wire [15:0] name_table_base = {register_file[5], register_file[4]};
-wire [15:0] colour_table_base = {register_file[7], register_file[6]};
+wire [15:0] attribute_table_base = {register_file[7], register_file[6]};
 wire [15:0] pattern_table_base = {register_file[9], register_file[8]};
+wire [15:0] palette_table_base = {register_file[11], register_file[10]};
 
 // VRAM <-> CPU bus
 reg [7:0] reg_select;
@@ -132,6 +133,7 @@ always @(posedge clk) begin
     {register_file[5], register_file[4]} = 16'h0000;
     {register_file[7], register_file[6]} = 16'h1000;
     {register_file[9], register_file[8]} = 16'h2000;
+    {register_file[11], register_file[10]} = 16'h2800;
   end
 end
 
@@ -196,12 +198,14 @@ reg [7:0] tile_pattern;
 reg tile_flip_v;
 reg tile_flip_h;
 reg [5:0] tile_attribute;
-reg [3:0] tile_fg_colour;
-reg [3:0] tile_bg_colour;
+reg [7:0] tile_fg_colour;
+reg [7:0] tile_bg_colour;
 
-reg [3:0] out_tile_fg_colour;
-reg [3:0] out_tile_bg_colour;
+reg [7:0] out_tile_fg_colour;
+reg [7:0] out_tile_bg_colour;
 reg [7:0] out_tile_pattern;
+
+integer i;
 
 always @(posedge dot_clk) begin
   // Default behaviour: innocuous read from VRAM and shift output pattern.
@@ -212,7 +216,7 @@ always @(posedge dot_clk) begin
 
   case(tile_state)
     3'h0: begin
-      // Prepare tile name read
+      // Look up tile name
       vram_address = {4'b0, v_ctr[8:4], h_ctr[9:3]};
       vram_address_base = name_table_base;
     end
@@ -223,22 +227,44 @@ always @(posedge dot_clk) begin
 
       // Look up tile attributes.
       vram_address = {4'b0, v_ctr[8:4], h_ctr[9:3]};
-      vram_address_base = colour_table_base;
+      vram_address_base = attribute_table_base;
     end
 
     3'h2: begin
       // Latch tile attributes
-      {tile_flip_v, tile_flip_h, tile_attribute} <= vram_data_out;
-      {tile_bg_colour, tile_fg_colour} <= vram_data_out;
+      {tile_flip_v, tile_flip_h, tile_attribute[5:0]} <= vram_data_out[7:0];
 
-      // Use tile name to look up pattern based on line
-      vram_address = {5'b0, tile_name, v_ctr[3:1]};
+      // Use tile name to look up pattern based on line. We have to re-use
+      // vram_data_out here because tile_flip_v is not vailable until next
+      // clock.
+      vram_address = {5'b0, tile_name, vram_data_out[7] ? 3'h7-v_ctr[3:1] : v_ctr[3:1]};
       vram_address_base = pattern_table_base;
     end
 
     3'h3: begin
       // Latch tile pattern.
-      tile_pattern <= vram_data_out;
+      for(i=0; i<8; i=i+1) begin
+        // tile_pattern[7:0] <= vram_data_out[7:0];
+        tile_pattern[i] <= tile_flip_h ? vram_data_out[7-i] : vram_data_out[i];
+      end
+
+      // Use attribute to index palette table
+      vram_address = {9'b0, tile_attribute, 1'b0};
+      vram_address_base = palette_table_base;
+    end
+
+    3'h4: begin
+      // Latch fg colour
+      tile_fg_colour <= vram_data_out;
+
+      // Use attribute to index palette table
+      vram_address = {9'b0, tile_attribute, 1'b1};
+      vram_address_base = palette_table_base;
+    end
+
+    3'h5: begin
+      // Latch bg colour
+      tile_bg_colour <= vram_data_out;
     end
 
     3'h6: begin
@@ -270,19 +296,13 @@ always @(posedge dot_clk) begin
   end
 end
 
-wire [3:0] out_tile_fg_r = out_tile_fg_colour[0] ? 4'hf : 4'h0;
-wire [3:0] out_tile_fg_g = {
-  out_tile_fg_colour[2], out_tile_fg_colour[2],
-  out_tile_fg_colour[1], out_tile_fg_colour[1]
-};
-wire [3:0] out_tile_fg_b = out_tile_fg_colour[3] ? 4'hf : 4'h0;
+wire [3:0] out_tile_fg_r = {out_tile_fg_colour[2:0], out_tile_fg_colour[0]};
+wire [3:0] out_tile_fg_g = {out_tile_fg_colour[5:3], out_tile_fg_colour[3]};
+wire [3:0] out_tile_fg_b = {out_tile_fg_colour[7:6], out_tile_fg_colour[6], out_tile_fg_colour[6]};
 
-wire [3:0] out_tile_bg_r = out_tile_bg_colour[0] ? 4'hf : 4'h0;
-wire [3:0] out_tile_bg_g = {
-  out_tile_bg_colour[2], out_tile_bg_colour[2],
-  out_tile_bg_colour[1], out_tile_bg_colour[1]
-};
-wire [3:0] out_tile_bg_b = out_tile_bg_colour[3] ? 4'hf : 4'h0;
+wire [3:0] out_tile_bg_r = {out_tile_bg_colour[2:0], out_tile_bg_colour[0]};
+wire [3:0] out_tile_bg_g = {out_tile_bg_colour[5:3], out_tile_bg_colour[3]};
+wire [3:0] out_tile_bg_b = {out_tile_bg_colour[7:6], out_tile_bg_colour[6], out_tile_bg_colour[6]};
 
 assign visible = (h_visible & v_visible);
 assign r = visible ? (out_tile_pattern[7] ? out_tile_fg_r : out_tile_bg_r) : 4'h0;
