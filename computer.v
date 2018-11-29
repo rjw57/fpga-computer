@@ -17,17 +17,14 @@ wire reset;
 wire cpu_clk;
 wire [15:0] cpu_addr;
 reg [7:0] cpu_data_in;
+reg [7:0] cpu_data_in_next;  // Data to present to CPU on next clock cycle
 wire [7:0] cpu_data_out;
 wire cpu_writing;
 
-// Memory data lines
+// IO data lines
 wire [7:0] rom_data;
 wire [7:0] ram_data;
-
-// VDP
-wire [15:0] vdp_addr;
 wire [7:0] vdp_data_out;
-reg [7:0] vdp_data_out_reg;
 
 // IO port
 reg [7:0] io_port;
@@ -44,15 +41,24 @@ reset_timer system_reset_timer(.clk(clk), .reset(reset));
 // Clock generation
 cpu_clock_generator cpu_clock_generator(.clk(clk), .cpu_clk(cpu_clk));
 
+// Latch CPU data in line while CPU reading
+always @(posedge clk)
+begin
+  if(~cpu_writing && ~cpu_clk) begin
+    if(rom_select) begin
+      cpu_data_in_next <= rom_data;
+    end else if(vdp_select) begin
+      cpu_data_in_next <= vdp_data_out;
+    end else begin
+      cpu_data_in_next <= ram_data;
+    end
+  end
+end
+
 // Latch CPU data in line on rising edge of CPU clock.
 always @(posedge cpu_clk)
 begin
-  if(rom_select)
-    cpu_data_in <= rom_data;
-  else if(vdp_select)
-    cpu_data_in <= vdp_data_out_reg;
-  else
-    cpu_data_in <= ram_data;
+  cpu_data_in <= cpu_data_in_next;
 end
 
 // The CPU itself.
@@ -97,9 +103,6 @@ end
 wire vdp_read = ~cpu_writing && ~cpu_clk && vdp_select;
 wire vdp_write = cpu_writing && ~cpu_clk && vdp_select;
 
-always @(posedge clk)
-  if(vdp_read) vdp_data_out_reg = vdp_data_out;
-
 vdp vdp(
   .reset(reset),
   .clk(clk),
@@ -121,7 +124,7 @@ module cpu_clock_generator(
 );
 
 // Derive CPU clock from system clock
-parameter CPU_DIV_W = 4; // divide by 16
+parameter CPU_DIV_W = 2; // divide by 4
 
 reg [CPU_DIV_W-1:0] cpu_clk_ctr = 0;
 

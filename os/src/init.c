@@ -91,7 +91,7 @@ void copy_font(void) {
 
 static u16 name_addr = 0, tile_addr = 0;
 void delay(void) {
-    u16 i = 0x1000;
+    u16 i = 0x8000;
     while(i) {
         --i;
         ++name_addr;
@@ -101,6 +101,18 @@ void delay(void) {
 static u16 ctr = 0;
 void idle(void) {
     IO_PORT = (u8)(++ctr);
+
+    if(ctr == 0x1000) {
+        ctr = 0;
+        VDP_REGISTER_SELECT = VDP_REG_WRITE_ADDR_L;
+        VDP_REGISTER_DATA = 0x00;
+        VDP_REGISTER_SELECT = VDP_REG_WRITE_ADDR_H;
+        VDP_REGISTER_DATA = 0x00;
+    }
+
+    VDP_VRAM_DATA = rand();
+
+    /*
     if(ctr == 0x1000) {
         ctr = 0;
         VDP_REGISTER_SELECT = VDP_REG_WRITE_ADDR_L;
@@ -110,5 +122,6 @@ void idle(void) {
     }
     VDP_VRAM_DATA = ((ctr & 0x1000) ? 0x0f : 0xff) & rand();
     //VDP_VRAM_DATA = VDP_VRAM_DATA;
-    //delay();
+    delay();
+    */
 }
