@@ -1,6 +1,5 @@
 module computer(
-  // Memory clock
-  input clk,
+  input clk, // 63MHz system clock
 
   output [7:0] io_port,
 
@@ -15,7 +14,6 @@ module computer(
 wire reset;
 
 // CPU Bus
-wire cpu_reset;
 wire cpu_clk;
 wire [15:0] cpu_addr;
 reg [7:0] cpu_data_in;
@@ -30,27 +28,29 @@ wire [7:0] ram_data;
 wire [15:0] vdp_addr;
 wire [7:0] vdp_data;
 
+// IO port
+reg [7:0] io_port;
+
+wire vdp_select = cpu_addr[15:8] == 8'b1100_0000; // $C000-$C0FF
+wire vdp_write = cpu_writing && ~cpu_clk && vdp_select;
+wire vdp_read = ~cpu_writing && ~cpu_clk && vdp_select;
+wire [7:0] vdp_data_out;
+reg [7:0] vdp_data_out_reg;
+
 // System reset line
 reset_timer system_reset_timer(.clk(clk), .reset(reset));
 
-// Derive CPU clock from memory clock
-parameter CPU_DIV_W = 4; // divide by 16
-reg [CPU_DIV_W-1:0] cpu_clk_ctr = 0;
-assign cpu_clk = cpu_clk_ctr[CPU_DIV_W-1];
-assign cpu_mem_clk = cpu_clk_ctr[CPU_DIV_W-2];
-always @(posedge clk) cpu_clk_ctr = cpu_clk_ctr + 1;
-
-// CPU Reset line
-reset_timer reset_timer(.clk(cpu_clk), .reset(cpu_reset));
+// Clock generation
+cpu_clock_generator cpu_clock_generator(.clk(clk), .cpu_clk(cpu_clk));
 
 // Latch writes to IO port
-reg [7:0] io_port;
 always @(posedge clk)
 begin
+  if(~cpu_clk && cpu_writing && cpu_addr == 16'h8400)
+    io_port = cpu_data_out;
+
   if(reset)
-    io_port <= 8'b0;
-  else if(~cpu_clk && cpu_writing && cpu_addr == 16'h8400)
-    io_port <= cpu_data_out;
+    io_port = 8'b0;
 end
 
 // Latch CPU data in line on rising edge of CPU clock
@@ -65,7 +65,7 @@ begin
 end
 
 cpu_65c02 cpu(
-  .reset(reset || cpu_reset),
+  .reset(reset),
   .clk(cpu_clk),
 
   .NMI(1'b0),
@@ -93,12 +93,6 @@ spram32k8 ram_bank_1(
   .data_out(ram_data)
 );
 
-wire vdp_select = cpu_addr[15:8] == 8'b1100_0000; // $C000-$C0FF
-wire vdp_write = cpu_writing && ~cpu_clk && vdp_select;
-wire vdp_read = ~cpu_writing && ~cpu_clk && vdp_select;
-wire [7:0] vdp_data_out;
-reg [7:0] vdp_data_out_reg;
-
 always @(posedge clk)
   if(vdp_read) vdp_data_out_reg <= vdp_data_out;
 
@@ -114,5 +108,21 @@ vdp vdp(
 
   .r(r), .g(g), .b(b), .hsync(hsync), .vsync(vsync)
 );
+
+endmodule
+
+module cpu_clock_generator(
+  input clk,
+  output cpu_clk
+);
+
+// Derive CPU clock from system clock
+parameter CPU_DIV_W = 4; // divide by 16
+
+reg [CPU_DIV_W-1:0] cpu_clk_ctr = 0;
+
+assign cpu_clk = cpu_clk_ctr[CPU_DIV_W-1];
+
+always @(posedge clk) cpu_clk_ctr = cpu_clk_ctr + 1;
 
 endmodule

@@ -6,15 +6,16 @@ module reset_timer(
   output reset
 );
 
-// Reset timer
-localparam RESET_CTR_WIDTH = 3;
+localparam RESET_CTR_WIDTH = 7;
+
 reg [RESET_CTR_WIDTH-1:0] reset_ctr = 0;
-assign reset = ~reset_ctr[RESET_CTR_WIDTH-1];
+
 always @(posedge clk)
 begin
-  if (reset_ctr[RESET_CTR_WIDTH-1] == 0) begin
-    reset_ctr <= reset_ctr + 1;
-  end
+  if (reset_ctr[RESET_CTR_WIDTH-1] == 0)
+    reset_ctr = reset_ctr + 1;
 end
+
+assign reset = ~reset_ctr[RESET_CTR_WIDTH-1];
 
 endmodule
