@@ -17,6 +17,7 @@ wire reset;
 wire cpu_clk;
 wire [15:0] cpu_addr;
 reg [7:0] cpu_data_in;
+reg [7:0] cpu_data_in_next;
 wire [7:0] cpu_data_out;
 wire cpu_writing;
 
@@ -27,15 +28,17 @@ wire [7:0] ram_data;
 // VDP
 wire [15:0] vdp_addr;
 wire [7:0] vdp_data;
+wire [7:0] vdp_data_out;
+reg [7:0] vdp_data_out_reg;
 
 // IO port
 reg [7:0] io_port;
 
-wire vdp_select = cpu_addr[15:8] == 8'b1100_0000; // $C000-$C0FF
-wire vdp_write = cpu_writing && ~cpu_clk && vdp_select;
-wire vdp_read = ~cpu_writing && ~cpu_clk && vdp_select;
-wire [7:0] vdp_data_out;
-reg [7:0] vdp_data_out_reg;
+// Address decoding
+wire rom_select = cpu_addr[15:13] == 3'b111;        // $E000-$FFFF
+wire vdp_select = cpu_addr[15:8] == 8'b1100_0000;   // $C000-$C0FF
+wire io_select = cpu_addr == 16'h8400;              // $8400
+wire ram_select = ~rom_select && ~vdp_select && ~io_select;
 
 // System reset line
 reset_timer system_reset_timer(.clk(clk), .reset(reset));
@@ -43,27 +46,18 @@ reset_timer system_reset_timer(.clk(clk), .reset(reset));
 // Clock generation
 cpu_clock_generator cpu_clock_generator(.clk(clk), .cpu_clk(cpu_clk));
 
-// Latch writes to IO port
-always @(posedge clk)
-begin
-  if(~cpu_clk && cpu_writing && cpu_addr == 16'h8400)
-    io_port = cpu_data_out;
-
-  if(reset)
-    io_port = 8'b0;
-end
-
-// Latch CPU data in line on rising edge of CPU clock
+// Latch CPU data in line on rising edge of CPU clock.
 always @(posedge cpu_clk)
 begin
-  if(cpu_addr[15:13] == 3'b111) // $F800-FFFF
-    cpu_data_in <= rom_data;
+  if(rom_select)
+    cpu_data_in = rom_data;
   else if(vdp_select)
-    cpu_data_in <= vdp_data_out_reg;
+    cpu_data_in = vdp_data_out_reg;
   else
-    cpu_data_in <= ram_data;
+    cpu_data_in = ram_data;
 end
 
+// The CPU itself.
 cpu_65c02 cpu(
   .reset(reset),
   .clk(cpu_clk),
@@ -93,16 +87,26 @@ spram32k8 ram_bank_1(
   .data_out(ram_data)
 );
 
+// Latch writes to IO port.
 always @(posedge clk)
-  if(vdp_read) vdp_data_out_reg <= vdp_data_out;
+begin
+  if(~cpu_clk && cpu_writing && io_select)
+    io_port = cpu_data_out;
+
+  if(reset)
+    io_port = 8'b0;
+end
+
+always @(posedge clk)
+  if(vdp_read) vdp_data_out_reg = vdp_data_out;
 
 vdp vdp(
   .reset(reset),
   .clk(clk),
 
   .mode(cpu_addr[1:0]),
-  .read(vdp_read),
-  .write(vdp_write),
+  .read(~cpu_writing && ~cpu_clk && vdp_select),
+  .write(cpu_writing && ~cpu_clk && vdp_select),
   .data_in(cpu_data_out),
   .data_out(vdp_data_out),
 
