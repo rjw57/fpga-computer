@@ -154,11 +154,19 @@ void idle(void) {
 
     VDP_VRAM_DATA = rand();
 
+    /*
     VDP_REGISTER_SELECT = VDP_REG_TILE_PHASES;
     VDP_REGISTER_DATA = (0xC7 & VDP_REGISTER_DATA) | ((0x7 & ctr) << 3);
 
     VDP_REGISTER_SELECT = VDP_REG_TILE_V_CONTROL;
     VDP_REGISTER_DATA = 0x80 | (0x7f & (ctr >> 3));
+    */
+
+    VDP_REGISTER_SELECT = VDP_REG_TILE_PHASES;
+    VDP_REGISTER_DATA = (0xF8 & VDP_REGISTER_DATA) | (0x7 & ctr);
+
+    //VDP_REGISTER_SELECT = VDP_REG_TILE_H_CONTROL;
+    //VDP_REGISTER_DATA = 0x7f & (ctr >> 3);
 
     //VDP_VRAM_DATA = ctr;
     //VDP_VRAM_DATA = VDP_VRAM_DATA;

@@ -313,12 +313,14 @@ always @(posedge dot_clk) begin
     end
   endcase
 
+  // Advance tile state
   tile_state = tile_state + 1;
 
   if(reset) begin
     vram_address = 16'h0000;
     vram_write_enable = 1'b0;
     vram_address_base = 16'h0000;
+    tile_state = 3'h0;
   end
 end
 
