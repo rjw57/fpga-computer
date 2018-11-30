@@ -60,7 +60,7 @@ bootrom.placeholder.hex:
 	$(ICETIME) -d $(DEVICE) -mtr $@ $<
 
 %_tb.out: %_tb.v $(SOURCES) $(SIM_EXTRA_SOURCES)
-	iverilog -o $@ $(filter %.v, $^) `yosys-config --datdir/ice40/cells_sim.v`
+	iverilog -Wall -Wno-implicit-dimensions -Wno-timescale -o $@ $(filter %.v, $^) `yosys-config --datdir/ice40/cells_sim.v`
 
 %_tb.vcd: %_tb.out
 	vvp -N $< +vcd=$@

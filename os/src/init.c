@@ -27,14 +27,17 @@ void idle(void);
 #define VDP_REG_WRITE_ADDR_H 0x01
 #define VDP_REG_READ_ADDR_L 0x02
 #define VDP_REG_READ_ADDR_H 0x03
-#define VDP_NAME_TABLE_BASE_L 0x04
-#define VDP_NAME_TABLE_BASE_H 0x05
-#define VDP_ATTRIBUTE_TABLE_BASE_L 0x06
-#define VDP_ATTRIBUTE_TABLE_BASE_H 0x07
-#define VDP_PATTERN_TABLE_BASE_L 0x08
-#define VDP_PATTERN_TABLE_BASE_H 0x09
-#define VDP_PALETTE_TABLE_BASE_L 0x0A
-#define VDP_PALETTE_TABLE_BASE_H 0x0B
+#define VDP_REG_NAME_TABLE_BASE_L 0x04
+#define VDP_REG_NAME_TABLE_BASE_H 0x05
+#define VDP_REG_ATTRIBUTE_TABLE_BASE_L 0x06
+#define VDP_REG_ATTRIBUTE_TABLE_BASE_H 0x07
+#define VDP_REG_PATTERN_TABLE_BASE_L 0x08
+#define VDP_REG_PATTERN_TABLE_BASE_H 0x09
+#define VDP_REG_PALETTE_TABLE_BASE_L 0x0A
+#define VDP_REG_PALETTE_TABLE_BASE_H 0x0B
+#define VDP_REG_TILE_PHASES 0x0C
+#define VDP_REG_TILE_H_CONTROL 0x0D
+#define VDP_REG_TILE_V_CONTROL 0x0E
 
 void copy_font(void);
 void clear_attribute(void);
@@ -109,7 +112,7 @@ void copy_font(void) {
 
 static u16 name_addr = 0, tile_addr = 0;
 void delay(void) {
-    u16 i = 0x0800;
+    u16 i = 0x2000;
     while(i) {
         --i;
         ++name_addr;
@@ -123,6 +126,8 @@ void idle(void) {
 
     if(ctr == 0x2000) {
         ctr = 0;
+    }
+    {
         VDP_REGISTER_SELECT = VDP_REG_WRITE_ADDR_L;
         VDP_REGISTER_DATA = 0x00;
         VDP_REGISTER_SELECT = VDP_REG_WRITE_ADDR_H;
@@ -134,7 +139,27 @@ void idle(void) {
         VDP_REGISTER_DATA = 0x00;
     }
 
+    VDP_VRAM_DATA = 'P';
+    {
+        VDP_REGISTER_SELECT = VDP_REG_WRITE_ADDR_L;
+        VDP_REGISTER_DATA = 0x00;
+        VDP_REGISTER_SELECT = VDP_REG_WRITE_ADDR_H;
+        VDP_REGISTER_DATA = 0x10;
+
+        VDP_REGISTER_SELECT = VDP_REG_READ_ADDR_L;
+        VDP_REGISTER_DATA = 0x01;
+        VDP_REGISTER_SELECT = VDP_REG_READ_ADDR_H;
+        VDP_REGISTER_DATA = 0x00;
+    }
+
     VDP_VRAM_DATA = rand();
+
+    VDP_REGISTER_SELECT = VDP_REG_TILE_PHASES;
+    VDP_REGISTER_DATA = (0xC7 & VDP_REGISTER_DATA) | ((0x7 & ctr) << 3);
+
+    VDP_REGISTER_SELECT = VDP_REG_TILE_V_CONTROL;
+    VDP_REGISTER_DATA = 0x80 | (0x7f & (ctr >> 3));
+
     //VDP_VRAM_DATA = ctr;
     //VDP_VRAM_DATA = VDP_VRAM_DATA;
 
@@ -149,5 +174,5 @@ void idle(void) {
     VDP_VRAM_DATA = ((ctr & 0x1000) ? 0x0f : 0xff) & rand();
     //VDP_VRAM_DATA = VDP_VRAM_DATA;
     */
-    //delay();
+    delay();
 }

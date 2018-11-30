@@ -47,6 +47,12 @@ wire [15:0] name_table_base = {register_file[5], register_file[4]};
 wire [15:0] attribute_table_base = {register_file[7], register_file[6]};
 wire [15:0] pattern_table_base = {register_file[9], register_file[8]};
 wire [15:0] palette_table_base = {register_file[11], register_file[10]};
+wire [2:0] horizontal_phase = register_file[12][2:0];
+wire [2:0] vertical_phase = register_file[12][5:3];
+wire [6:0] start_tile_column = register_file[13][6:0];
+wire double_width_tiles = register_file[13][7];
+wire [6:0] start_tile_row = register_file[14][6:0];
+wire double_height_tiles = register_file[14][7];
 
 // VRAM <-> CPU bus
 reg [7:0] reg_select;
@@ -56,9 +62,13 @@ reg [7:0] vram_read_data;
 reg [7:0] vram_write_data;
 reg vram_write_requested;
 
-// Horizontal and vertical counters
+// Horizontal and vertical counters for VGA timing
 reg [H_WIDTH-1:0] h_ctr;
 reg [V_WIDTH-1:0] v_ctr;
+
+// Horizontal tile and vertical row counters
+reg [6:0] tile_ctr;
+reg [9:0] row_ctr;
 
 // Visibility flags
 reg h_visible;
@@ -91,14 +101,6 @@ always @(posedge clk) dot_clk = reset ? 1'b0 : ~dot_clk;
 
 // CPU <-> registers and VRAM memory.
 always @(posedge clk) begin
-  // Latch control lines for next clock cycle
-  mode_prev <= mode;
-  data_in_prev <= data_in;
-  read_prev <= read;
-  write_prev <= write;
-  vram_write_enable_prev <= vram_write_enable;
-  vram_write_requested_prev <= vram_write_requested;
-
   // A write to VRAM was completed
   if(~vram_write_enable && vram_write_enable_prev && vram_write_requested) begin
     vram_write_requested = 1'b0;
@@ -114,18 +116,26 @@ always @(posedge clk) begin
   if(~write && write_prev) begin
     case(mode_prev)
       // Register select
-      2'b00: reg_select <= data_in_prev;
+      2'b00: reg_select = data_in_prev;
 
       // Write register
       2'b01: register_file[reg_select] = data_in_prev;
 
       // Write data
       2'b10: begin
-        vram_write_data <= data_in_prev;
+        vram_write_data = data_in_prev;
         vram_write_requested = 1'b1;
       end
     endcase
   end
+
+  // Latch control lines for next clock cycle
+  mode_prev = mode;
+  data_in_prev = data_in;
+  read_prev = read;
+  write_prev = write;
+  vram_write_enable_prev = vram_write_enable;
+  vram_write_requested_prev = vram_write_requested;
 
   if(reset) begin
     {register_file[1], register_file[0]} = 16'h0000;
@@ -134,6 +144,9 @@ always @(posedge clk) begin
     {register_file[7], register_file[6]} = 16'h1000;
     {register_file[9], register_file[8]} = 16'h2000;
     {register_file[11], register_file[10]} = 16'h2800;
+    register_file[12] = 8'h00;
+    register_file[13] = 8'h00;
+    register_file[14] = 8'h80;
   end
 end
 
@@ -169,25 +182,34 @@ end
 // Line counter & sync
 always @(posedge line_clk) begin
   if(reset) begin
-    v_ctr <= 0;
-    vsync <= V_SYNC_POSITIVE ? 1'b0 : 1'b1;
-    v_visible <= 1'b0;
+    v_ctr = 0;
+    row_ctr = 0;
+    vsync = V_SYNC_POSITIVE ? 1'b0 : 1'b1;
+    v_visible = 1'b0;
   end else begin
-    v_ctr <= v_ctr + 1;
-
     if(v_ctr == V_WHOLE_FRAME-1) begin
       // reset counter at end of frame
-      v_ctr <= 0;
-      v_visible <= 1'b1;
-    end else if(v_ctr == V_VISIBLE-1)
-      // end of visible frame
-      v_visible <= 1'b0;
-    else if(v_ctr == V_VISIBLE+V_FRONT_PORCH-1)
-      // start of sync pulse
-      vsync <= V_SYNC_POSITIVE ? 1'b1 : 1'b0;
-    else if(v_ctr == V_VISIBLE+V_FRONT_PORCH+V_SYNC_PULSE-1)
-      // end of sync pulse
-      vsync <= V_SYNC_POSITIVE ? 1'b0 : 1'b1;
+      v_ctr = 0;
+      row_ctr = {start_tile_row, vertical_phase};
+      v_visible = 1'b1;
+    end else begin
+      if(v_ctr == V_VISIBLE-1) begin
+        // end of visible frame
+        v_visible = 1'b0;
+      end else if(v_ctr == V_VISIBLE+V_FRONT_PORCH-1) begin
+        // start of sync pulse
+        vsync = V_SYNC_POSITIVE ? 1'b1 : 1'b0;
+      end else if(v_ctr == V_VISIBLE+V_FRONT_PORCH+V_SYNC_PULSE-1) begin
+        // end of sync pulse
+        vsync = V_SYNC_POSITIVE ? 1'b0 : 1'b1;
+      end
+
+      if(~double_height_tiles || v_ctr[0]) begin
+        row_ctr = row_ctr + 1;
+      end
+
+      v_ctr = v_ctr + 1;
+    end
   end
 end
 
@@ -216,28 +238,32 @@ always @(posedge dot_clk) begin
 
   case(tile_state)
     3'h0: begin
+      // If this dot is visible, we need to advance the character counter first.
+      // Otherwise, reset it to the initial value.
+      tile_ctr = h_visible ? tile_ctr + 1 : start_tile_column;
+
       // Look up tile name
-      vram_address = {4'b0, v_ctr[8:4], h_ctr[9:3]};
+      vram_address = {4'b0, row_ctr[7:3], tile_ctr};
       vram_address_base = name_table_base;
     end
 
     3'h1: begin
       // Latch tile name.
-      tile_name <= vram_data_out;
+      tile_name = vram_data_out;
 
       // Look up tile attributes.
-      vram_address = {4'b0, v_ctr[8:4], h_ctr[9:3]};
+      vram_address = {4'b0, row_ctr[7:3], tile_ctr};
       vram_address_base = attribute_table_base;
     end
 
     3'h2: begin
       // Latch tile attributes
-      {tile_flip_v, tile_flip_h, tile_attribute[5:0]} <= vram_data_out[7:0];
+      {tile_flip_v, tile_flip_h, tile_attribute[5:0]} = vram_data_out[7:0];
 
       // Use tile name to look up pattern based on line. We have to re-use
       // vram_data_out here because tile_flip_v is not vailable until next
       // clock.
-      vram_address = {5'b0, tile_name, vram_data_out[7] ? 3'h7-v_ctr[3:1] : v_ctr[3:1]};
+      vram_address = {5'b0, tile_name, vram_data_out[7] ? 3'h7-row_ctr[2:0] : row_ctr[2:0]};
       vram_address_base = pattern_table_base;
     end
 
@@ -245,7 +271,7 @@ always @(posedge dot_clk) begin
       // Latch tile pattern.
       for(i=0; i<8; i=i+1) begin
         // tile_pattern[7:0] <= vram_data_out[7:0];
-        tile_pattern[i] <= tile_flip_h ? vram_data_out[7-i] : vram_data_out[i];
+        tile_pattern[i] = tile_flip_h ? vram_data_out[7-i] : vram_data_out[i];
       end
 
       // Use attribute to index palette table
@@ -255,7 +281,7 @@ always @(posedge dot_clk) begin
 
     3'h4: begin
       // Latch fg colour
-      tile_fg_colour <= vram_data_out;
+      tile_fg_colour = vram_data_out;
 
       // Use attribute to index palette table
       vram_address = {9'b0, tile_attribute, 1'b1};
@@ -264,7 +290,7 @@ always @(posedge dot_clk) begin
 
     3'h5: begin
       // Latch bg colour
-      tile_bg_colour <= vram_data_out;
+      tile_bg_colour = vram_data_out;
     end
 
     3'h6: begin
@@ -274,7 +300,7 @@ always @(posedge dot_clk) begin
 
     3'h7: begin
       // Latch CPU data
-      vram_read_data <= vram_data_out;
+      vram_read_data = vram_data_out;
 
       // Latch next tile pattern, etc.
       out_tile_pattern = tile_pattern;
@@ -304,7 +330,7 @@ wire [3:0] out_tile_bg_r = {out_tile_bg_colour[2:0], out_tile_bg_colour[0]};
 wire [3:0] out_tile_bg_g = {out_tile_bg_colour[5:3], out_tile_bg_colour[3]};
 wire [3:0] out_tile_bg_b = {out_tile_bg_colour[7:6], out_tile_bg_colour[6], out_tile_bg_colour[6]};
 
-assign visible = (h_visible & v_visible);
+wire visible = (h_visible & v_visible);
 assign r = visible ? (out_tile_pattern[7] ? out_tile_fg_r : out_tile_bg_r) : 4'h0;
 assign g = visible ? (out_tile_pattern[7] ? out_tile_fg_g : out_tile_bg_g) : 4'h0;
 assign b = visible ? (out_tile_pattern[7] ? out_tile_fg_b : out_tile_bg_b) : 4'h0;
