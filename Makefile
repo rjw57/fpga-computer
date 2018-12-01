@@ -29,7 +29,7 @@ all: $(PROJ).bin
 
 .PHONY: all
 
-sim: bc6502/bc6502_tb.vcd
+sim: example_tb.vcd
 
 .PHONY: sim
 
