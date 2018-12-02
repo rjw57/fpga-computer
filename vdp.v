@@ -16,6 +16,9 @@ module vdp (
 );
 
 // Control registers
+reg [15:0] vram_write_address;
+reg [15:0] vram_read_address;
+
 reg [10:0] h_total;       // Total width in pixels
 reg [10:0] h_sync_start;  // HSync start pixel
 reg [10:0] h_displayed;   // Displayed pixels
@@ -65,6 +68,11 @@ reg line_clk_prev;
 assign hsync = h_sync_polarity ? h_sync_enabled : ~h_sync_enabled;
 assign vsync = v_sync_polarity ? v_sync_enabled : ~v_sync_enabled;
 
+// Data to be written to VRAM/data which has been read.
+reg [7:0] vram_write_data;
+reg vram_write_requested;
+reg [7:0] vram_read_data;
+
 // Latch control lines
 always @(posedge clk) begin
   mode_reg <= mode;
@@ -76,6 +84,9 @@ end
 // Writes from CPU
 always @(posedge clk) begin
   if(reset) begin
+    vram_write_address <= 0;
+    vram_read_address <= 0;
+
     h_total <= 1088-1;
     h_visible <= 848-1;
     h_sync_start <= 864-1;
@@ -98,31 +109,36 @@ always @(posedge clk) begin
       1: begin
         // Write to register
         case(reg_select)
-          0: h_total[7:0] <= data_in_reg;
-          1: h_total[10:8] <= data_in_reg[2:0];
-          2: h_sync_start[7:0] <= data_in_reg;
-          3: h_sync_start[10:8] <= data_in_reg[2:0];
-          4: h_displayed[7:0] <= data_in_reg;
-          5: begin
+          0: vram_write_address[7:0] <= data_in_reg;
+          1: vram_write_address[15:8] <= data_in_reg;
+          2: vram_read_address[7:0] <= data_in_reg;
+          3: vram_read_address[15:8] <= data_in_reg;
+          4: h_total[7:0] <= data_in_reg;
+          5: h_total[10:8] <= data_in_reg[2:0];
+          6: h_sync_start[7:0] <= data_in_reg;
+          7: h_sync_start[10:8] <= data_in_reg[2:0];
+          8: h_displayed[7:0] <= data_in_reg;
+          9: begin
             h_displayed[10:8] <= data_in_reg[2:0];
             h_sync_polarity <= data_in_reg[7];
           end
-          6: h_sync_length <= data_in_reg;
-          7: v_total[7:0] <= data_in_reg;
-          8: v_total[10:8] <= data_in_reg[2:0];
-          9: v_sync_start[7:0] <= data_in_reg;
-          10: v_sync_start[10:8] <= data_in_reg[2:0];
-          11: v_displayed[7:0] <= data_in_reg;
-          12: begin
+          10: h_sync_length <= data_in_reg;
+          11: v_total[7:0] <= data_in_reg;
+          12: v_total[10:8] <= data_in_reg[2:0];
+          13: v_sync_start[7:0] <= data_in_reg;
+          14: v_sync_start[10:8] <= data_in_reg[2:0];
+          15: v_displayed[7:0] <= data_in_reg;
+          16: begin
             v_displayed[10:8] <= data_in_reg[2:0];
             v_sync_polarity <= data_in_reg[7];
           end
-          12: v_sync_length <= data_in_reg;
+          17: v_sync_length <= data_in_reg;
         endcase
       end
 
       2: begin
         // Write to VRAM
+        vram_write_data <= data_in_reg;
       end
     endcase
   end
@@ -200,19 +216,35 @@ always @(posedge clk) begin
   end
 end
 
-/*
+reg [13:0] vram_addr;
+wire [15:0] vram_data_in = {vram_write_data, vram_write_data};
+wire [3:0] vram_maskwren = vram_write_address[0] ? 4'b1100 : 4'b0011;
+wire [15:0] vram_data_out;
+wire vram_write_enable = ~dot_clk && vram_write_requested;
+
+always @* begin
+  if(dot_clk) begin
+    vram_addr = 0;
+  end else begin
+    if(vram_write_requested) begin
+      vram_addr = vram_write_address[14:1];
+    end else begin
+      vram_addr = vram_read_address[14:1];
+    end
+  end
+end
+
 SB_SPRAM256KA spram(
   .CLOCK(clk),
-  .ADDRESS(addr[14:1]),
-  .DATAIN(spram_datain),
-  .MASKWREN(spram_maskwren),
-  .WREN(write_enable),
+  .ADDRESS(vram_addr),
+  .DATAIN(vram_data_in),
+  .MASKWREN(vram_maskwren),
+  .WREN(vram_write_enable),
   .CHIPSELECT(1'b1),
-  .DATAOUT(spram_dataout),
+  .DATAOUT(vram_data_out),
   .SLEEP(1'b0),
   .POWEROFF(1'b1),
   .STANDBY(1'b0)
 );
-*/
 
 endmodule
