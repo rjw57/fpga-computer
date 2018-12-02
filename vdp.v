@@ -67,16 +67,15 @@ reg line_clk_prev;
 // VRAM interface
 reg [13:0] vram_addr;
 reg vram_write_enable;
-reg [15:0] vram_data_out;
+reg [15:0] vram_data_in;
+reg [3:0] vram_maskwren;
+wire [15:0] vram_data_out;
 
 // Latched data for VDP from VRAM
 reg [15:0] vram_data_vdp;
 
 // Data which has been read from VRAM
 reg [15:0] vram_read_data;
-
-reg [15:0] vram_data_in;
-reg [3:0] vram_maskwren;
 
 // The VRAM is shared between the VDP and the CPU bus. This flag indicates which
 // control signals are currently wired up to the VRAM.
@@ -229,29 +228,43 @@ always @(posedge clk) begin
   end
 end
 
-always @(posedge clk) begin
+reg [2:0] address_state;
+reg [13:0] tile_address;
+reg [15:0] tile_data;
+reg [13:0] pattern_address;
+reg [15:0] pattern_data;
+reg [13:0] palette_address;
+reg [15:0] palette_data;
+
+always @(*) begin
   // VRAM address and write enable depends on who has access and the current
   // write mode.
-  if(cpu_has_vram && write && (mode == 2'b10)) begin
-    vram_addr <= vram_write_address[14:1];
-    vram_write_enable <= 1;
-  end else if(cpu_has_vram) begin
-    vram_addr <= vram_read_address[14:1];
-    vram_write_enable <= 0;
-  end else begin
+  if(~cpu_has_vram) begin
     vram_addr <= {v_ctr[5:0], h_ctr[7:0]};
-    vram_write_enable <= 0;
+  end else if(write_reg && (mode_reg == 2'b10)) begin
+    vram_addr <= vram_write_address[14:1];
+  end else begin
+    vram_addr <= vram_read_address[14:1];
   end
+
+  // The SB_SPRAM256KA write enable signal is not registered so we make sure
+  // that it only goes high in the -ve portion of the system clock cycle after
+  // address and data inputs have been registered.
+  vram_write_enable <= ~clk && cpu_has_vram && write_reg && (mode_reg == 2'b10);
 
   // The VRAM data input and write mask are always set as if CPU is accessing
   // because these signals are ignored when VDP is accessing.
-  vram_data_in <= {data_in, data_in};
+  vram_data_in <= {data_in_reg, data_in_reg};
   vram_maskwren <= vram_write_address[0] ? 4'b1100 : 4'b0011;
+end
 
+always @(posedge clk) begin
+  // SB_SPRAM256KA outputs are unregistered so we need to register them
+  // ourselves. Latch output from VRAM based on who had access last cycle.
   if(cpu_has_vram) begin
-    vram_read_data <= vram_data_out;
+    tile_data <= vram_data_out;
   end else begin
-    vram_data_vdp <= vram_data_out;
+    vram_read_data <= vram_data_out;
   end
 
   // Swap ownership of VRAM on next system clock
@@ -276,9 +289,9 @@ reg [3:0] out_g;
 reg [3:0] out_b;
 
 always @(posedge dot_clk) begin
-  out_r <= vram_data_vdp[3:0];
-  out_g <= vram_data_vdp[7:4];
-  out_b <= vram_data_vdp[11:8];
+  out_r <= tile_data[3:0];
+  out_g <= tile_data[7:4];
+  out_b <= tile_data[11:8];
 end
 
 wire visible = h_visible && v_visible;

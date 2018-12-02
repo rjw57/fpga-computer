@@ -110,20 +110,20 @@ void delay(void) {
 
 static u16 ctr = 0, ctr2 = 0;
 void idle(void) {
-    IO_PORT = (u8)(++ctr);
     ++ctr2;
 
-    if(ctr == 0x2000) {
-        ctr = 0;
+    if(ctr2 == 0x2000) {
+        IO_PORT = (u8)(++ctr);
+        ctr2 = 0;
         VDP_REGISTER_SELECT = VDP_REG_WRITE_ADDR_L;
         VDP_REGISTER_DATA = 0x00;
         VDP_REGISTER_SELECT = VDP_REG_WRITE_ADDR_H;
         VDP_REGISTER_DATA = 0x00;
 
         VDP_REGISTER_SELECT = VDP_REG_READ_ADDR_L;
-        VDP_REGISTER_DATA = 0x01;
-        VDP_REGISTER_SELECT = VDP_REG_READ_ADDR_H;
         VDP_REGISTER_DATA = 0x00;
+        VDP_REGISTER_SELECT = VDP_REG_READ_ADDR_H;
+        VDP_REGISTER_DATA = 0x10;
     }
 
     /*
