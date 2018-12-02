@@ -45,7 +45,7 @@ bootrom.placeholder.hex:
 	icebram -g -s 1234 8 8192 >"$@"
 
 %.blif: $(SOURCES) $(HW_EXTRA_SOURCES)
-	yosys -p 'synth_ice40 -top top -blif $@' $(filter %.v, $^)
+	yosys -f 'verilog -sv' -p 'synth_ice40 -top top -blif $@' $(filter %.v, $^)
 
 %.tmp.asc: $(PIN_DEF) %.blif
 	$(ARACHNE) $(ARACHNE_ARGS) -d $(subst up,,$(subst hx,,$(subst lp,,$(DEVICE)))) -o $@ -p $^

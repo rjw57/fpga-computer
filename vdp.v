@@ -64,49 +64,62 @@ reg dot_clk_prev;
 reg line_clk;
 reg line_clk_prev;
 
+// VRAM interface
+reg [13:0] vram_addr;
+reg vram_write_enable;
+reg [15:0] vram_data_out;
+
+// Latched data for VDP from VRAM
+reg [15:0] vram_data_vdp;
+
+// Data which has been read from VRAM
+reg [15:0] vram_read_data;
+
+reg [15:0] vram_data_in;
+reg [3:0] vram_maskwren;
+
+// The VRAM is shared between the VDP and the CPU bus. This flag indicates which
+// control signals are currently wired up to the VRAM.
+reg cpu_has_vram;
+
 // Output sync pulses
 assign hsync = h_sync_polarity ? h_sync_enabled : ~h_sync_enabled;
 assign vsync = v_sync_polarity ? v_sync_enabled : ~v_sync_enabled;
 
-// Data to be written to VRAM/data which has been read.
-reg [7:0] vram_write_data;
-reg vram_write_requested;
-reg [7:0] vram_read_data;
-
-// Latch control lines
+// Writes from CPU
 always @(posedge clk) begin
+  // Latch control lines for next cycle to detect edges
   mode_reg <= mode;
   write_reg <= write;
   read_reg <= read;
   data_in_reg <= data_in;
-end
 
-// Writes from CPU
-always @(posedge clk) begin
   if(reset) begin
     vram_write_address <= 0;
     vram_read_address <= 0;
 
+    // Reset to 848x480 resolution
+
     h_total <= 1088-1;
-    h_visible <= 848-1;
+    h_displayed <= 848-1;
     h_sync_start <= 864-1;
     h_sync_length <= 112-1;
     h_sync_polarity <= 1;
 
     v_total <= 517-1;
-    v_visible <= 480-1;
+    v_displayed <= 480-1;
     v_sync_start <= 486-1;
     v_sync_length <= 8-1;
     v_sync_polarity <= 1;
   end else if(~write && write_reg) begin
     // Negative write edge
-    case(mode)
-      0: begin
+    case(mode_reg)
+      2'b00: begin
         // Update register select
         reg_select <= data_in_reg;
       end
 
-      1: begin
+      2'b01: begin
         // Write to register
         case(reg_select)
           0: vram_write_address[7:0] <= data_in_reg;
@@ -136,9 +149,9 @@ always @(posedge clk) begin
         endcase
       end
 
-      2: begin
-        // Write to VRAM
-        vram_write_data <= data_in_reg;
+      2'b10: begin
+        // Write to VRAM finished, advance write address
+        vram_write_address <= vram_write_address + 1;
       end
     endcase
   end
@@ -216,22 +229,33 @@ always @(posedge clk) begin
   end
 end
 
-reg [13:0] vram_addr;
-wire [15:0] vram_data_in = {vram_write_data, vram_write_data};
-wire [3:0] vram_maskwren = vram_write_address[0] ? 4'b1100 : 4'b0011;
-wire [15:0] vram_data_out;
-wire vram_write_enable = ~dot_clk && vram_write_requested;
-
-always @* begin
-  if(dot_clk) begin
-    vram_addr = 0;
+always @(posedge clk) begin
+  // VRAM address and write enable depends on who has access and the current
+  // write mode.
+  if(cpu_has_vram && write && (mode == 2'b10)) begin
+    vram_addr <= vram_write_address[14:1];
+    vram_write_enable <= 1;
+  end else if(cpu_has_vram) begin
+    vram_addr <= vram_read_address[14:1];
+    vram_write_enable <= 0;
   end else begin
-    if(vram_write_requested) begin
-      vram_addr = vram_write_address[14:1];
-    end else begin
-      vram_addr = vram_read_address[14:1];
-    end
+    vram_addr <= {v_ctr[5:0], h_ctr[7:0]};
+    vram_write_enable <= 0;
   end
+
+  // The VRAM data input and write mask are always set as if CPU is accessing
+  // because these signals are ignored when VDP is accessing.
+  vram_data_in <= {data_in, data_in};
+  vram_maskwren <= vram_write_address[0] ? 4'b1100 : 4'b0011;
+
+  if(cpu_has_vram) begin
+    vram_read_data <= vram_data_out;
+  end else begin
+    vram_data_vdp <= vram_data_out;
+  end
+
+  // Swap ownership of VRAM on next system clock
+  cpu_has_vram <= reset ? 0 : ~cpu_has_vram;
 end
 
 SB_SPRAM256KA spram(
@@ -246,5 +270,20 @@ SB_SPRAM256KA spram(
   .POWEROFF(1'b1),
   .STANDBY(1'b0)
 );
+
+reg [3:0] out_r;
+reg [3:0] out_g;
+reg [3:0] out_b;
+
+always @(posedge dot_clk) begin
+  out_r <= vram_data_vdp[3:0];
+  out_g <= vram_data_vdp[7:4];
+  out_b <= vram_data_vdp[11:8];
+end
+
+wire visible = h_visible && v_visible;
+assign r = visible ? out_r : 0;
+assign g = visible ? out_g : 0;
+assign b = visible ? out_b : 0;
 
 endmodule
