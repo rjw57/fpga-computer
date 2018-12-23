@@ -20,6 +20,7 @@ reg [7:0] cpu_data_in;
 reg [7:0] cpu_data_in_next;  // Data to present to CPU on next clock cycle
 wire [7:0] cpu_data_out;
 wire cpu_writing;
+wire rdy;
 
 // IO data lines
 wire [7:0] rom_data;
