@@ -18,6 +18,8 @@ void init(void);
 // Idle loop routine. Called repeatedly until the end of time.
 void idle(void);
 
+#define PATTERN_TABLE_BASE 0x2000
+
 #define IO_PORT (*((volatile u8*)0x8400))
 #define VDP_REGISTER_SELECT (*((volatile u8*)0xC000))
 #define VDP_REGISTER_DATA (*((volatile u8*)0xC001))
@@ -34,6 +36,8 @@ void idle(void);
 #define VDP_REG_V_BLANK         0x08
 #define VDP_REG_V_FRONT_PORCH   0x09
 #define VDP_REG_SYNC_LENGTHS    0x0a
+#define VDP_REG_PTRN_TBL_BASE_L 0x0b
+#define VDP_REG_PTRN_TBL_BASE_H 0x0c
 
 void vdp_set_reg(u8 reg, u8 value);
 void vdp_set_addr(u8 low_reg, u16 value);
@@ -51,8 +55,8 @@ void init(void) {
     IRQ_ENABLE();
 
     // Change screen mode
-    vdp_mode_640x480();
-    //vdp_mode_848x480();
+    //vdp_mode_640x480();
+    vdp_mode_848x480();
 
     copy_font();
     clear_attribute();
@@ -156,7 +160,8 @@ void copy_font(void) {
     u16 i;
     const u8* font = font_bin;
 
-    vdp_set_addr(VDP_REG_WRITE_ADDR_L, 0x2000);
+    vdp_set_addr(VDP_REG_PTRN_TBL_BASE_L, PATTERN_TABLE_BASE);
+    vdp_set_addr(VDP_REG_WRITE_ADDR_L, PATTERN_TABLE_BASE);
 
     for(i=0; i<2048; i++, font++) {
         VDP_VRAM_DATA = *font;
