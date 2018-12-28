@@ -20,6 +20,8 @@ reg [7:0]   reg_address;
 reg [15:0]  read_address;
 reg [15:0]  write_address;
 reg [15:0]  pattern_table_base;
+reg [15:0]  name_table_base;
+reg [15:0]  attr_table_base;
 
 reg [7:0]   h_display_chars;
 reg [7:0]   h_blank_chars;
@@ -55,7 +57,9 @@ assign      vsync = v_sync_active ? v_sync_polarity : ~v_sync_polarity;
 
 // Output character pattern
 reg [7:0]   next_char_pattern;
+reg [7:0]   next_char_attrs;
 reg [7:0]   char_pattern;
+reg [7:0]   char_attrs;
 
 // Output pixel generation
 wire        visible = h_visible && v_visible;
@@ -66,9 +70,9 @@ wire        char_clk = ~clock_ctr[3];
 
 reg [3:0]  px_colour;
 
-assign r = visible ? px_colour : 4'h0;
-assign g = visible ? px_colour : 4'h0;
-assign b = visible ? px_colour : 4'h0;
+assign r = visible ? {px_colour[3], px_colour[0], px_colour[0], px_colour[0]} : 4'h0;
+assign g = visible ? {px_colour[3], px_colour[1], px_colour[1], px_colour[1]} : 4'h0;
+assign b = visible ? {px_colour[3], px_colour[2], px_colour[2], px_colour[2]} : 4'h0;
 
 // Character dot counter
 always @(posedge clk) begin
@@ -86,6 +90,8 @@ always @(posedge clk) begin
     read_address <= 0;
     write_address <= 0;
     pattern_table_base <= 0;
+    name_table_base <= 0;
+    attr_table_base <= 0;
 
     h_display_chars <= 0;
     h_blank_chars <= 0;
@@ -123,6 +129,10 @@ always @(posedge clk) begin
             10: {v_sync_chars, h_sync_chars} <= data_in;
             11: pattern_table_base[7:0] <= data_in;
             12: pattern_table_base[15:8] <= data_in;
+            13: name_table_base[7:0] <= data_in;
+            14: name_table_base[15:8] <= data_in;
+            15: attr_table_base[7:0] <= data_in;
+            16: attr_table_base[15:8] <= data_in;
           endcase
         end
 
@@ -153,9 +163,9 @@ reg vram_write_enable;
 wire [15:0] vram_addr = vram_offset + vram_base;
 
 spram32k8 vram(
-  .clk(clk),
+  .clk(~dot_clk),
   .addr(vram_addr[14:0]),
-  .write_enable(vram_write_enable && dot_clk),
+  .write_enable(vram_write_enable),
   .data_in(vram_data_to_write),
   .data_out(vram_data_out)
 );
@@ -179,29 +189,30 @@ always @(posedge dot_clk) begin
   end else begin
     case(char_state)
       0: begin
-        vram_base <= 16'h0000;
+        vram_base <= name_table_base;
         vram_offset <= {5'b0, v_ctr[10:4], h_ctr};
         vram_write_acknowledge <= vram_write_enable;
         if(~vram_write_enable) begin
-          vram_data_read <= vram_data;
+          vram_data_read <= vram_data_out;
         end
         vram_write_enable <= 0;
         char_state <= 1;
       end
       1: begin
         vram_base <= pattern_table_base;
-        vram_offset <= {5'b0, vram_data, v_ctr[3:1]};
+        vram_offset <= {5'b0, vram_data_out, v_ctr[3:1]};
         vram_write_enable <= 0;
         char_state <= 2;
       end
       2: begin
-        next_char_pattern <= vram_data;
-        vram_base <= 16'h0000;
-        vram_offset <= 0; //{5'b0, v_ctr[10:4], h_ctr};
+        next_char_pattern <= vram_data_out;
+        vram_base <= attr_table_base;
+        vram_offset <= {5'b0, v_ctr[10:4], h_ctr};
         vram_write_enable <= 0;
         char_state <= 3;
       end
       3: begin
+        next_char_attrs <= vram_data_out;
         vram_base <= 16'h0000;
         vram_offset <= vram_write_request ? write_address : read_address;
         vram_write_enable <= vram_write_request;
@@ -214,14 +225,16 @@ end
 always @(posedge dot_clk) begin
   if (reset) begin
     char_pattern = 8'h00;
-    px_colour <= 4'h0;
+    char_attrs = 8'h00;
+    px_colour = 4'h0;
   end else begin
-    px_colour <= char_pattern[7] ? 4'hF : 4'h0;
+    px_colour = char_pattern[7] ? char_attrs[3:0] : char_attrs[7:4];
 
     if(clock_ctr[3:1] == 7) begin
-      char_pattern <= next_char_pattern;
+      char_pattern = next_char_pattern;
+      char_attrs = next_char_attrs;
     end else begin
-      char_pattern <= {char_pattern[6:0], 1'b0};
+      char_pattern = {char_pattern[6:0], 1'b0};
     end
   end
 end

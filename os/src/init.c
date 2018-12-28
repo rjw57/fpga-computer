@@ -38,6 +38,10 @@ void idle(void);
 #define VDP_REG_SYNC_LENGTHS    0x0a
 #define VDP_REG_PTRN_TBL_BASE_L 0x0b
 #define VDP_REG_PTRN_TBL_BASE_H 0x0c
+#define VDP_REG_NAME_TBL_BASE_L 0x0d
+#define VDP_REG_NAME_TBL_BASE_H 0x0e
+#define VDP_REG_ATTR_TBL_BASE_L 0x0f
+#define VDP_REG_ATTR_TBL_BASE_H 0x10
 
 void vdp_set_reg(u8 reg, u8 value);
 void vdp_set_addr(u8 low_reg, u16 value);
@@ -64,6 +68,8 @@ void init(void) {
 
     vdp_set_reg(VDP_REG_WRITE_ADDR_L, 0x0000);
     vdp_set_reg(VDP_REG_READ_ADDR_L, 0x0000);
+    vdp_set_addr(VDP_REG_NAME_TBL_BASE_L, 0x0000);
+    vdp_set_addr(VDP_REG_ATTR_TBL_BASE_L, 0x2800);
 
     srand(1234);
 
@@ -151,8 +157,8 @@ void clear_palette(void) {
 
     vdp_set_addr(VDP_REG_WRITE_ADDR_L, 0x2800);
 
-    for(i=0; i<64; i++) {
-        VDP_VRAM_DATA = rand();
+    for(i=0; i<0x2000; i++) {
+        VDP_VRAM_DATA = i;
     }
 }
 
