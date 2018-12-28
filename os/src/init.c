@@ -55,8 +55,8 @@ void init(void) {
     IRQ_ENABLE();
 
     // Change screen mode
-    //vdp_mode_640x480();
-    vdp_mode_848x480();
+    vdp_mode_640x480();
+    //vdp_mode_848x480();
 
     copy_font();
     clear_attribute();
@@ -179,67 +179,14 @@ void delay(void) {
 
 static u16 ctr = 0, ctr2 = 0;
 void idle(void) {
-    ++ctr2;
-
     if(ctr2 == 0x2000) {
         IO_PORT = (u8)(++ctr);
-        ctr2 = 0;
-        VDP_REGISTER_SELECT = VDP_REG_WRITE_ADDR_L;
-        VDP_REGISTER_DATA = 0x00;
-        VDP_REGISTER_SELECT = VDP_REG_WRITE_ADDR_H;
-        VDP_REGISTER_DATA = 0x00;
-
-        VDP_REGISTER_SELECT = VDP_REG_READ_ADDR_L;
-        VDP_REGISTER_DATA = 0x00;
-        VDP_REGISTER_SELECT = VDP_REG_READ_ADDR_H;
-        VDP_REGISTER_DATA = 0x10;
+        vdp_set_addr(VDP_REG_WRITE_ADDR_L, 0x0000);
+        vdp_set_addr(VDP_REG_READ_ADDR_L, 0x0000);
+        ctr2 = 1;
+        VDP_VRAM_DATA = rand();
+    } else {
+        ++ctr2;
+        VDP_VRAM_DATA = rand();
     }
-
-    /*
-    VDP_VRAM_DATA = 'P';
-    {
-        VDP_REGISTER_SELECT = VDP_REG_WRITE_ADDR_L;
-        VDP_REGISTER_DATA = 0x00;
-        VDP_REGISTER_SELECT = VDP_REG_WRITE_ADDR_H;
-        VDP_REGISTER_DATA = 0x10;
-
-        VDP_REGISTER_SELECT = VDP_REG_READ_ADDR_L;
-        VDP_REGISTER_DATA = 0x01;
-        VDP_REGISTER_SELECT = VDP_REG_READ_ADDR_H;
-        VDP_REGISTER_DATA = 0x00;
-    }
-*/
-    VDP_VRAM_DATA = rand();
-    //delay();
-
-    /*
-    VDP_REGISTER_SELECT = VDP_REG_TILE_PHASES;
-    VDP_REGISTER_DATA = (0xC7 & VDP_REGISTER_DATA) | ((0x7 & ctr) << 3);
-
-    VDP_REGISTER_SELECT = VDP_REG_TILE_V_CONTROL;
-    VDP_REGISTER_DATA = 0x80 | (0x7f & (ctr >> 3));
-    */
-    /*
-    VDP_REGISTER_SELECT = VDP_REG_TILE_PHASES;
-    VDP_REGISTER_DATA = (0xF8 & VDP_REGISTER_DATA) | (0x7 & ctr);
-*/
-
-    //VDP_REGISTER_SELECT = VDP_REG_TILE_H_CONTROL;
-    //VDP_REGISTER_DATA = 0x7f & (ctr >> 3);
-
-    //VDP_VRAM_DATA = ctr;
-    //VDP_VRAM_DATA = VDP_VRAM_DATA;
-
-    /*
-    if(ctr == 0x1000) {
-        ctr = 0;
-        VDP_REGISTER_SELECT = VDP_REG_WRITE_ADDR_L;
-        VDP_REGISTER_DATA = 0x00;
-        VDP_REGISTER_SELECT = VDP_REG_WRITE_ADDR_H;
-        VDP_REGISTER_DATA = 0x00;
-    }
-    VDP_VRAM_DATA = ((ctr & 0x1000) ? 0x0f : 0xff) & rand();
-    //VDP_VRAM_DATA = VDP_VRAM_DATA;
-    */
-    //delay();
 }

@@ -64,7 +64,7 @@ reg [3:0]   clock_ctr = 0;
 wire        dot_clk = ~clock_ctr[0];
 wire        char_clk = ~clock_ctr[3];
 
-reg [3:0] px_colour;
+reg [3:0]  px_colour;
 
 assign r = visible ? px_colour : 4'h0;
 assign g = visible ? px_colour : 4'h0;
@@ -100,6 +100,7 @@ always @(posedge clk) begin
     v_sync_chars <= 0;
 
     write_reg <= 0;
+    mode_reg <= 0;
   end else begin
     if(write) begin
       case(mode)
@@ -127,10 +128,13 @@ always @(posedge clk) begin
 
         2: begin
           vram_data_to_write <= data_in;
-          vram_write_request <= 1'b1;
         end
       endcase
-    end else if(vram_write_request) begin
+    end
+
+    if(~write && write_reg && (mode_reg == 2)) begin
+      vram_write_request <= 1'b1;
+    end else if(vram_write_request && vram_write_acknowledge) begin
       write_address <= write_address + 1;
       vram_write_request <= 1'b0;
     end
@@ -140,86 +144,81 @@ always @(posedge clk) begin
   end
 end
 
-wire [15:0] vram_addr;
-wire [7:0] vram_data_in;
+reg [15:0] vram_offset;
+reg [15:0] vram_base;
 wire [7:0] vram_data_out;
-wire vram_write_enable;
-wire vram_read_cpu;
-wire vram_read_ppu;
+reg [7:0] vram_data;
+reg vram_write_enable;
 
-reg [7:0] vdp_data;
-reg [15:0] vdp_addr;
-reg [15:0] vdp_base;
-reg vdp_read;
-
-always @(posedge clk) begin
-  if(reset) begin
-    vdp_data <= 8'h00;
-  end else if(vram_read_ppu) begin
-    vdp_data <= vram_data_out;
-  end
-end
+wire [15:0] vram_addr = vram_offset + vram_base;
 
 spram32k8 vram(
   .clk(clk),
   .addr(vram_addr[14:0]),
-  .write_enable(vram_write_enable),
-  .data_in(vram_data_in),
+  .write_enable(vram_write_enable && dot_clk),
+  .data_in(vram_data_to_write),
   .data_out(vram_data_out)
 );
 
-MemoryMultiplex mux(
-  .reset(reset),
-  .clk(clk),
-  .ce(1'b1),
+always @(posedge clk) begin
+  vram_data <= vram_data_out;
+end
 
-  .cpu_addr(write_address),
-  .cpu_read(1'b0),
-  .cpu_write(vram_write_request),
-  .cpu_din(vram_data_to_write),
-
-  .vdp_addr(vdp_addr + vdp_base),
-  .vdp_read(vdp_read),
-  .vdp_write(1'b0),
-  .vdp_din(8'h00),
-
-  .memory_read_cpu(vram_read_cpu),
-  .memory_read_ppu(vram_read_ppu),
-
-  .memory_addr(vram_addr),
-  .memory_write(vram_write_enable),
-  .memory_dout(vram_data_in)
-);
-
-wire writing_data = write && (mode == 2'b10);
-wire [2:0] char_state = clock_ctr[3:1];
+//wire [2:0] char_state = clock_ctr[2:0];
+reg [2:0] char_state;
 reg write_cycle;
 
 always @(posedge dot_clk) begin
   if(reset) begin
-    vdp_base <= 16'h0000;
-    vdp_addr <= 16'h0000;
-    vdp_read <= 1'b0;
+    vram_offset <= 16'h0000;
+    vram_base <= 16'h0000;
+    vram_write_enable <= 0;
+    char_state <= 0;
+    next_char_pattern <= 8'h00;
+    vram_write_acknowledge <= 0;
   end else begin
     case(char_state)
       0: begin
-        vdp_addr <= {v_ctr[7:0], h_ctr};
-        vdp_read <= 1'b1;
+        vram_base <= 16'h0000;
+        vram_offset <= {5'b0, v_ctr[10:4], h_ctr};
+        vram_write_acknowledge <= vram_write_enable;
+        if(~vram_write_enable) begin
+          vram_data_read <= vram_data;
+        end
+        vram_write_enable <= 0;
+        char_state <= 1;
       end
       1: begin
-        next_char_pattern <= vdp_data;
-        vdp_addr <= 16'h0000;
-        vdp_read <= 1'b0;
+        vram_base <= pattern_table_base;
+        vram_offset <= {5'b0, vram_data, v_ctr[3:1]};
+        vram_write_enable <= 0;
+        char_state <= 2;
       end
-      default: begin
-        vdp_addr <= 16'h0000;
-        vdp_read <= 1'b0;
+      2: begin
+        next_char_pattern <= vram_data;
+        vram_base <= 16'h0000;
+        vram_offset <= 0; //{5'b0, v_ctr[10:4], h_ctr};
+        vram_write_enable <= 0;
+        char_state <= 3;
+      end
+      3: begin
+        vram_base <= 16'h0000;
+        vram_offset <= vram_write_request ? write_address : read_address;
+        vram_write_enable <= vram_write_request;
+        char_state <= 0;
       end
     endcase
+  end
+end
 
+always @(posedge dot_clk) begin
+  if (reset) begin
+    char_pattern = 8'h00;
+    px_colour <= 4'h0;
+  end else begin
     px_colour <= char_pattern[7] ? 4'hF : 4'h0;
 
-    if(char_state == 7) begin
+    if(clock_ctr[3:1] == 7) begin
       char_pattern <= next_char_pattern;
     end else begin
       char_pattern <= {char_pattern[6:0], 1'b0};
@@ -282,41 +281,4 @@ always @(posedge char_clk) begin
   end
 end
 
-endmodule
-
-
-// Multiplexes accesses by the VDP and the PRG into a single memory, used for both
-// ROM and internal memory.
-// VDP has priority, its read/write will be honored asap, while the CPU's reads
-// will happen only every second cycle when the VDP is idle.
-// Data read by VDP will be available on the next clock cycle.
-// Data read by CPU will be available within at most 2 clock cycles.
-
-module MemoryMultiplex(input clk, input ce, input reset,
-                       input [15:0] cpu_addr, input cpu_read, input cpu_write, input [7:0] cpu_din,
-                       input [15:0] vdp_addr, input vdp_read, input vdp_write, input [7:0] vdp_din,
-                       // Access signals for the SRAM.
-                       output [15:0] memory_addr,   // address to access
-                       output memory_read_cpu,      // read into CPU latch
-                       output memory_read_ppu,      // read into VDP latch
-                       output memory_write,         // is a write operation
-                       output [7:0] memory_dout);
-  reg saved_cpu_read, saved_cpu_write;
-  assign memory_addr = (vdp_read || vdp_write) ? vdp_addr : cpu_addr;
-  assign memory_write = (vdp_read || vdp_write) ? vdp_write : saved_cpu_write;
-  assign memory_read_ppu = vdp_read;
-  assign memory_read_cpu = !(vdp_read || vdp_write) && (cpu_read || saved_cpu_read);
-  assign memory_dout = vdp_write ? vdp_din : cpu_din;
-  always @(posedge clk) if (reset) begin
-    saved_cpu_read <= 0;
-    saved_cpu_write <= 0;
-  end else if (ce) begin
-    if (vdp_read || vdp_write) begin
-      saved_cpu_read <= cpu_read || saved_cpu_read;
-      saved_cpu_write <= cpu_write || saved_cpu_write;
-    end else begin
-      saved_cpu_read <= 0;
-      saved_cpu_write <= cpu_write;
-    end
-  end
 endmodule
