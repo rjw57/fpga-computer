@@ -125,7 +125,7 @@ module cpu_clock_generator(
 );
 
 // Derive CPU clock from system clock
-parameter CPU_DIV_W = 3;
+parameter CPU_DIV_W = 2;
 
 reg [CPU_DIV_W-1:0] cpu_clk_ctr = 0;
 

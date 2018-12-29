@@ -68,7 +68,7 @@ reg [3:0]   clock_ctr = 0;
 wire        dot_clk = ~clock_ctr[0];
 wire        char_clk = ~clock_ctr[3];
 
-reg [3:0]  px_colour;
+wire [3:0]  px_colour;
 
 assign r = visible ? {px_colour[3], px_colour[0], px_colour[0], px_colour[0]} : 4'h0;
 assign g = visible ? {px_colour[3], px_colour[1], px_colour[1], px_colour[1]} : 4'h0;
@@ -143,10 +143,10 @@ always @(posedge clk) begin
     end
 
     if(~write && write_reg && (mode_reg == 2)) begin
-      vram_write_request <= 1'b1;
+      vram_write_request <= 1;
     end else if(vram_write_request && vram_write_acknowledge) begin
+      vram_write_request <= 0;
       write_address <= write_address + 1;
-      vram_write_request <= 1'b0;
     end
 
     write_reg <= write;
@@ -161,81 +161,105 @@ reg [7:0] vram_data;
 reg vram_write_enable;
 
 wire [15:0] vram_addr = vram_offset + vram_base;
+wire cpu_writing = (write && (mode == 2'b10));
+
+/*
+reg vram_mode;
+reg [7:0] vram_data_in;
+always @(posedge dot_clk) if(reset) begin
+  vram_mode = 0;
+  vram_addr = 0;
+  vram_data_in = 0;
+  vram_write_enable = 0;
+  vram_data = 0;
+  vram_write_acknowledge = 0;
+end else begin
+  if(vram_mode) begin
+    vram_addr = vram_base + vram_offset;
+    vram_write_enable = 0;
+    vram_data_read = vram_data_out;
+  end else begin
+    vram_addr = vram_write_request ? write_address : read_address;
+    vram_write_enable = vram_write_request;
+    vram_write_acknowledge = vram_write_request;
+    vram_data = vram_data_out;
+  end
+
+  vram_mode = ~vram_mode;
+end
+*/
 
 spram32k8 vram(
-  .clk(~dot_clk),
+  .clk(clk),
   .addr(vram_addr[14:0]),
-  .write_enable(vram_write_enable),
+  .write_enable(vram_write_enable && dot_clk),
   .data_in(vram_data_to_write),
   .data_out(vram_data_out)
 );
 
-always @(posedge clk) begin
-  vram_data <= vram_data_out;
-end
-
-//wire [2:0] char_state = clock_ctr[2:0];
 reg [2:0] char_state;
-reg write_cycle;
+assign px_colour = char_pattern[7] ? char_attrs[3:0] : char_attrs[7:4];
 
 always @(posedge dot_clk) begin
   if(reset) begin
     vram_offset <= 16'h0000;
     vram_base <= 16'h0000;
     vram_write_enable <= 0;
-    char_state <= 0;
-    next_char_pattern <= 8'h00;
     vram_write_acknowledge <= 0;
+    char_state <= 0;
+
+    next_char_pattern <= 8'h00;
+    next_char_attrs <= 8'h00;
+
+    char_pattern = 8'h00;
+    char_attrs = 8'h00;
   end else begin
     case(char_state)
       0: begin
-        vram_base <= name_table_base;
-        vram_offset <= {5'b0, v_ctr[10:4], h_ctr};
-        vram_write_acknowledge <= vram_write_enable;
-        if(~vram_write_enable) begin
-          vram_data_read <= vram_data_out;
-        end
-        vram_write_enable <= 0;
-        char_state <= 1;
-      end
-      1: begin
-        vram_base <= pattern_table_base;
-        vram_offset <= {5'b0, vram_data_out, v_ctr[3:1]};
-        vram_write_enable <= 0;
-        char_state <= 2;
-      end
-      2: begin
-        next_char_pattern <= vram_data_out;
         vram_base <= attr_table_base;
         vram_offset <= {5'b0, v_ctr[10:4], h_ctr};
         vram_write_enable <= 0;
-        char_state <= 3;
+      end
+      1: begin
+        next_char_attrs <= vram_data_out;
+        vram_base <= name_table_base;
+        vram_offset <= {5'b0, v_ctr[10:4], h_ctr};
+        vram_write_enable <= 0;
+      end
+      2: begin
+        vram_base <= pattern_table_base;
+        vram_offset <= {5'b0, vram_data_out, v_ctr[3:1]};
+        vram_write_enable <= 0;
       end
       3: begin
-        next_char_attrs <= vram_data_out;
+        next_char_pattern <= vram_data_out;
         vram_base <= 16'h0000;
         vram_offset <= vram_write_request ? write_address : read_address;
         vram_write_enable <= vram_write_request;
-        char_state <= 0;
+      end
+      default: begin
+        vram_base <= 16'h0000;
+        vram_offset <= 16'h0000;
+        vram_write_enable <= 0;
       end
     endcase
-  end
-end
 
-always @(posedge dot_clk) begin
-  if (reset) begin
-    char_pattern = 8'h00;
-    char_attrs = 8'h00;
-    px_colour = 4'h0;
-  end else begin
-    px_colour = char_pattern[7] ? char_attrs[3:0] : char_attrs[7:4];
+    if(vram_write_enable && vram_write_request) begin
+      vram_write_acknowledge <= 1;
+    end else if(vram_write_acknowledge) begin
+      vram_write_acknowledge <= vram_write_request;
+    end else begin
+      vram_write_acknowledge <= 0;
+    end
 
-    if(clock_ctr[3:1] == 7) begin
+    if(char_state == 7) begin
       char_pattern = next_char_pattern;
       char_attrs = next_char_attrs;
     end else begin
       char_pattern = {char_pattern[6:0], 1'b0};
     end
+
+    char_state <= char_state + 1;
   end
 end
 
