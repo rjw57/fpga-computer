@@ -8,6 +8,8 @@ module vdp (
   input [7:0] data_in,
   output [7:0] data_out,
 
+  output rdy,
+
   output [3:0] r,
   output [3:0] g,
   output [3:0] b,
@@ -34,6 +36,8 @@ reg [7:0]   v_blank_lines;
 reg         v_sync_polarity;
 reg [6:0]   v_front_porch_lines;
 reg [3:0]   v_sync_chars;
+
+reg rdy;
 
 // CPU <-> VRAM interface
 reg [7:0]   vram_data_to_write;
@@ -107,6 +111,8 @@ always @(posedge clk) begin
 
     write_reg <= 0;
     mode_reg <= 0;
+
+    rdy <= 1;
   end else begin
     if(write) begin
       case(mode)
@@ -142,6 +148,10 @@ always @(posedge clk) begin
       endcase
     end
 
+    // If we're still waiting for a VRAM write request to complete, don't allow
+    // another.
+    rdy <= ~write || (mode != 2) || ~vram_write_request;
+
     if(~write && write_reg && (mode_reg == 2)) begin
       vram_write_request <= 1;
     end else if(vram_write_request && vram_write_acknowledge) begin
@@ -162,32 +172,6 @@ reg vram_write_enable;
 
 wire [15:0] vram_addr = vram_offset + vram_base;
 wire cpu_writing = (write && (mode == 2'b10));
-
-/*
-reg vram_mode;
-reg [7:0] vram_data_in;
-always @(posedge dot_clk) if(reset) begin
-  vram_mode = 0;
-  vram_addr = 0;
-  vram_data_in = 0;
-  vram_write_enable = 0;
-  vram_data = 0;
-  vram_write_acknowledge = 0;
-end else begin
-  if(vram_mode) begin
-    vram_addr = vram_base + vram_offset;
-    vram_write_enable = 0;
-    vram_data_read = vram_data_out;
-  end else begin
-    vram_addr = vram_write_request ? write_address : read_address;
-    vram_write_enable = vram_write_request;
-    vram_write_acknowledge = vram_write_request;
-    vram_data = vram_data_out;
-  end
-
-  vram_mode = ~vram_mode;
-end
-*/
 
 spram32k8 vram(
   .clk(clk),

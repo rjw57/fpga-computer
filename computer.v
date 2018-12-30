@@ -69,7 +69,7 @@ cpu_65c02 cpu(
 
   .NMI(1'b0),
   .IRQ(1'b0),
-  .RDY(1'b1),
+  .RDY(rdy),
 
   .AB(cpu_addr),
   .WE(cpu_writing),
@@ -107,6 +107,7 @@ wire vdp_write = cpu_writing && ~cpu_clk && vdp_select;
 vdp vdp(
   .reset(reset),
   .clk(clk),
+  .rdy(rdy),
 
   .mode(cpu_addr[1:0]),
   .read(vdp_read),

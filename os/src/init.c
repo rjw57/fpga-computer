@@ -174,12 +174,9 @@ void copy_font(void) {
     }
 }
 
-static u16 name_addr = 0, tile_addr = 0;
-void delay(void) {
-    u16 i = 0x2000;
+void delay(u16 i) {
     while(i) {
         --i;
-        ++name_addr;
     }
 }
 
@@ -194,5 +191,6 @@ void idle(void) {
     } else {
         ++ctr2;
         VDP_VRAM_DATA = rand();
+        // delay(0x10);
     }
 }
