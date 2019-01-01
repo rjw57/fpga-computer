@@ -52,22 +52,30 @@ void copy_font(void);
 void clear_attribute(void);
 void clear_palette(void);
 
+void delay(u16 i);
+
 void init(void) {
     IO_PORT = 0xff;
 
     // enable interrupts
     IRQ_ENABLE();
 
+    vdp_set_addr(VDP_REG_READ_ADDR_L, 0x1234);
+    vdp_set_addr(VDP_REG_WRITE_ADDR_L, 0x1234);
+    VDP_VRAM_DATA = 0x5a;
+    vdp_set_addr(VDP_REG_WRITE_ADDR_L, 0x0000);
+    VDP_VRAM_DATA = 0x88;
+
     // Change screen mode
     vdp_mode_640x480();
     //vdp_mode_848x480();
 
     copy_font();
-    clear_attribute();
+    //clear_attribute();
     clear_palette();
 
-    vdp_set_reg(VDP_REG_WRITE_ADDR_L, 0x0000);
-    vdp_set_reg(VDP_REG_READ_ADDR_L, 0x0000);
+    vdp_set_addr(VDP_REG_WRITE_ADDR_L, 0x0000);
+    vdp_set_addr(VDP_REG_READ_ADDR_L, 0x0000);
     vdp_set_addr(VDP_REG_NAME_TBL_BASE_L, 0x0000);
     vdp_set_addr(VDP_REG_ATTR_TBL_BASE_L, 0x2800);
 
@@ -142,11 +150,6 @@ void clear_attribute(void) {
 
     vdp_set_addr(VDP_REG_WRITE_ADDR_L, 0x1000);
 
-    VDP_REGISTER_SELECT = VDP_REG_WRITE_ADDR_L;
-    VDP_REGISTER_DATA = 0x00;
-    VDP_REGISTER_SELECT = VDP_REG_WRITE_ADDR_H;
-    VDP_REGISTER_DATA = 0x10;
-
     for(i=0; i<4096; i++) {
         VDP_VRAM_DATA = rand();
     }
@@ -186,11 +189,11 @@ void idle(void) {
         IO_PORT = (u8)(++ctr);
         vdp_set_addr(VDP_REG_WRITE_ADDR_L, 0x0000);
         vdp_set_addr(VDP_REG_READ_ADDR_L, 0x0000);
-        ctr2 = 1;
-        VDP_VRAM_DATA = rand();
+        //ctr2 = 1;
+        //VDP_VRAM_DATA = rand();
     } else {
+        VDP_VRAM_DATA = ctr2 & 0xff; // rand();
         ++ctr2;
-        VDP_VRAM_DATA = rand();
-        // delay(0x10);
+        delay(0x2000);
     }
 }
