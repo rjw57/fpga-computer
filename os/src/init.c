@@ -42,6 +42,19 @@ void idle(void);
 #define VDP_REG_NAME_TBL_BASE_H 0x0e
 #define VDP_REG_ATTR_TBL_BASE_L 0x0f
 #define VDP_REG_ATTR_TBL_BASE_H 0x10
+#define VDP_REG_H_CHARS         0x11
+
+#define BOX_VERT                0xB3
+#define BOX_HORIZ               0xC4
+#define BOX_TL                  0xDA
+#define BOX_TR                  0xBF
+#define BOX_BL                  0xC0
+#define BOX_BR                  0xD9
+#define BOX_L_BAR               0xB4
+#define BOX_R_BAR               0xC3
+
+static u8 scr_width, scr_height;
+static u16 attr_base, name_base;
 
 void vdp_set_reg(u8 reg, u8 value);
 void vdp_set_addr(u8 low_reg, u16 value);
@@ -50,9 +63,10 @@ void vdp_mode_848x480(void);
 
 void copy_font(void);
 void clear_attribute(void);
-void clear_palette(void);
 
 void delay(u16 i);
+
+void box(u8 left, u8 top, u8 width, u8 height, u8 attr);
 
 void init(void) {
     IO_PORT = 0xff;
@@ -71,13 +85,10 @@ void init(void) {
     //vdp_mode_848x480();
 
     copy_font();
-    //clear_attribute();
-    clear_palette();
+    clear_attribute();
 
     vdp_set_addr(VDP_REG_WRITE_ADDR_L, 0x0000);
     vdp_set_addr(VDP_REG_READ_ADDR_L, 0x0000);
-    vdp_set_addr(VDP_REG_NAME_TBL_BASE_L, 0x0000);
-    vdp_set_addr(VDP_REG_ATTR_TBL_BASE_L, 0x2800);
 
     srand(1234);
 
@@ -108,6 +119,11 @@ void vdp_mode_640x480(void) {
     const u8 v_front_porch_lines    = 1;
     const u8 v_sync_len_lines       = 3;
 
+    scr_width = h_displayed_chars;
+    scr_height = v_displayed_chars >> 1;
+    name_base = 0;
+    attr_base = scr_width * scr_height;
+
     vdp_set_reg(VDP_REG_H_DISPLAYED, h_displayed_chars-1);
     vdp_set_reg(VDP_REG_H_BLANK, h_blank_chars-1);
     vdp_set_reg(VDP_REG_H_FRONT_PORCH,
@@ -118,6 +134,11 @@ void vdp_mode_640x480(void) {
         (v_sync_polarity ? 0x80 : 0x00) | (v_front_porch_lines - 1));
     vdp_set_reg(VDP_REG_SYNC_LENGTHS,
         (v_sync_len_lines << 4) | h_sync_len_chars);
+
+    vdp_set_reg(VDP_REG_H_CHARS, scr_width);
+
+    vdp_set_addr(VDP_REG_NAME_TBL_BASE_L, name_base);
+    vdp_set_addr(VDP_REG_ATTR_TBL_BASE_L, attr_base);
 }
 
 void vdp_mode_848x480(void) {
@@ -133,6 +154,11 @@ void vdp_mode_848x480(void) {
     const u8 v_front_porch_lines    = 6;
     const u8 v_sync_len_lines       = 8;
 
+    scr_width = h_displayed_chars;
+    scr_height = v_displayed_chars >> 1;
+    name_base = 0;
+    attr_base = scr_width * scr_height;
+
     vdp_set_reg(VDP_REG_H_DISPLAYED, h_displayed_chars-1);
     vdp_set_reg(VDP_REG_H_BLANK, h_blank_chars-1);
     vdp_set_reg(VDP_REG_H_FRONT_PORCH,
@@ -143,24 +169,57 @@ void vdp_mode_848x480(void) {
         (v_sync_polarity ? 0x80 : 0x00) | (v_front_porch_lines - 1));
     vdp_set_reg(VDP_REG_SYNC_LENGTHS,
         (v_sync_len_lines << 4) | h_sync_len_chars);
+
+    vdp_set_reg(VDP_REG_H_CHARS, scr_width);
+
+    vdp_set_addr(VDP_REG_NAME_TBL_BASE_L, name_base);
+    vdp_set_addr(VDP_REG_ATTR_TBL_BASE_L, attr_base);
+}
+
+void box(u8 left, u8 top, u8 width, u8 height, u8 attr) {
+    u8 r, c;
+    for(r=0; r<height; ++r) {
+        vdp_set_addr(VDP_REG_WRITE_ADDR_L, name_base + ((r+top)*scr_width) + left);
+        if(width > 0) {
+            if(r == 0) {
+                VDP_VRAM_DATA = BOX_TL;
+            } else if(r == (height-1)) {
+                VDP_VRAM_DATA = BOX_BL;
+            } else {
+                VDP_VRAM_DATA = BOX_VERT;
+            }
+        }
+        if(((r==0) || (r==(height-1))) && (width > 2)) {
+            for(c=0; c<width-2; ++c) {
+                VDP_VRAM_DATA = BOX_HORIZ;
+            }
+        } else {
+            for(c=0; c<width-2; ++c) {
+                VDP_VRAM_DATA = ' ';
+            }
+        }
+        if(width > 1) {
+            if(r == 0) {
+                VDP_VRAM_DATA = BOX_TR;
+            } else if(r == (height-1)) {
+                VDP_VRAM_DATA = BOX_BR;
+            } else {
+                VDP_VRAM_DATA = BOX_VERT;
+            }
+        }
+        vdp_set_addr(VDP_REG_WRITE_ADDR_L, attr_base + ((r+top)*scr_width) + left);
+        for(c=0; c<width; ++c) {
+            VDP_VRAM_DATA = attr;
+        }
+    }
 }
 
 void clear_attribute(void) {
     u16 i;
 
-    vdp_set_addr(VDP_REG_WRITE_ADDR_L, 0x1000);
+    vdp_set_addr(VDP_REG_WRITE_ADDR_L, attr_base);
 
-    for(i=0; i<4096; i++) {
-        VDP_VRAM_DATA = rand();
-    }
-}
-
-void clear_palette(void) {
-    u16 i;
-
-    vdp_set_addr(VDP_REG_WRITE_ADDR_L, 0x2800);
-
-    for(i=0; i<0x2000; i++) {
+    for(i=0; i<scr_width*scr_height; i++) {
         VDP_VRAM_DATA = i;
     }
 }
@@ -183,17 +242,30 @@ void delay(u16 i) {
     }
 }
 
-static u16 ctr = 0, ctr2 = 0;
+void at(u8 x, u8 y, u8 c, u8 attr) {
+    vdp_set_addr(VDP_REG_WRITE_ADDR_L, name_base + x + (y * scr_width));
+    VDP_VRAM_DATA = c;
+    vdp_set_addr(VDP_REG_WRITE_ADDR_L, attr_base + x + (y * scr_width));
+    VDP_VRAM_DATA = attr;
+}
+
+static u16 ctr = 0, ctr2 = 0, state = 0;
 void idle(void) {
-    if(ctr2 == 0x2000) {
-        IO_PORT = (u8)(++ctr);
-        vdp_set_addr(VDP_REG_WRITE_ADDR_L, 0x0000);
-        vdp_set_addr(VDP_REG_READ_ADDR_L, 0x0000);
-        //ctr2 = 1;
-        //VDP_VRAM_DATA = rand();
-    } else {
-        VDP_VRAM_DATA = ctr2 & 0xff; // rand();
-        ++ctr2;
-        delay(0x2000);
+    box(0, 0, scr_width, scr_height, 0x4F);
+
+    while(1) {
+        at(
+            1 + (rand() % (scr_width-2)),
+            1 + (rand() % (scr_height-2)),
+            rand() & 0xff,
+            rand() & 0x0f | 0x40
+        );
+
+        if(ctr2 == 0x100) {
+            IO_PORT = (u8)(++ctr);
+            ctr2 = 0;
+        } else {
+            ++ctr2;
+        }
     }
 }

@@ -53,13 +53,9 @@ begin
     end else begin
       cpu_data_in_next <= ram_data;
     end
+  end else if(cpu_clk) begin
+    cpu_data_in <= cpu_data_in_next;
   end
-end
-
-// Latch CPU data in line on rising edge of CPU clock.
-always @(posedge cpu_clk)
-begin
-  cpu_data_in <= cpu_data_in_next;
 end
 
 // The CPU itself.

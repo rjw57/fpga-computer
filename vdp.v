@@ -13,8 +13,8 @@ module vdp (
   output [3:0] r,
   output [3:0] g,
   output [3:0] b,
-  output hsync,
-  output vsync
+  output reg hsync,
+  output reg vsync
 );
 
 // Registers
@@ -37,7 +37,13 @@ reg         v_sync_polarity;
 reg [6:0]   v_front_porch_lines;
 reg [3:0]   v_sync_chars;
 
+reg [7:0]   h_chars;
+
 reg rdy;
+
+// CPU <-> register interface
+reg write_reg;
+reg [1:0] mode_reg;
 
 // CPU <-> VRAM interface
 reg [7:0]   vram_data_to_write;
@@ -45,19 +51,26 @@ reg [7:0]   vram_data_read;
 reg         vram_write_request;
 reg         vram_write_acknowledge;
 
+// VRAM interface
+reg [15:0] vram_offset;
+reg [15:0] vram_base;
+wire [7:0] vram_data_out;
+reg [7:0] vram_data;
+
+reg [1:0] mem_state;
+reg vram_write_enable;
+
 // Horizontal timing
 reg [7:0]   h_ctr;
 reg [3:0]   h_sync_ctr;
 reg         h_sync_active;
 reg         h_visible;
-assign      hsync = h_sync_active ? h_sync_polarity : ~h_sync_polarity;
 
 // Vertical timing
 reg [10:0]  v_ctr;
 reg [3:0]   v_sync_ctr;
 reg         v_sync_active;
 reg         v_visible;
-assign      vsync = v_sync_active ? v_sync_polarity : ~v_sync_polarity;
 
 // Character addressing
 reg [15:0]  char_addr;
@@ -75,24 +88,26 @@ reg [7:0]   char_pattern;
 reg [7:0]   char_attrs;
 
 // Output pixel generation
-wire        visible = h_visible && v_visible;
+reg         visible;
 
 reg [3:0]   clock_ctr = 0;
 wire        dot_clk = ~clock_ctr[0];
 wire        char_clk = ~clock_ctr[3];
 wire [2:0]  char_dot = clock_ctr[3:1];
 
-/*
-assign r = visible ? char_addr[7:4] : 4'h0;
-assign g = visible ? char_dot : 4'h0;
-assign b = visible ? char_addr[3:0] : 4'h0;
-*/
+// At each new character, the previous character's visibility, H and V sync
+// signals are latched.
+always @(posedge char_clk) begin
+  visible <= h_visible && v_visible;
+  hsync <= h_sync_active ? h_sync_polarity : ~h_sync_polarity;
+  vsync <= v_sync_active ? v_sync_polarity : ~v_sync_polarity;
+end
 
 wire [3:0]  px_colour;
 
-assign r = visible ? {px_colour[3] ? px_colour[0] : 1'b0, px_colour[0], px_colour[0], px_colour[0]} : 4'h0;
-assign g = visible ? {px_colour[3] ? px_colour[1] : 1'b0, px_colour[1], px_colour[1], px_colour[1]} : 4'h0;
-assign b = visible ? {px_colour[3] ? px_colour[2] : 1'b0, px_colour[2], px_colour[2], px_colour[2]} : 4'h0;
+assign r = visible ? {px_colour[3], px_colour[0], px_colour[3] && px_colour[0], px_colour[3] && px_colour[0]} : 4'h0;
+assign g = visible ? {px_colour[3], px_colour[1], px_colour[3] && px_colour[1], px_colour[3] && px_colour[1]} : 4'h0;
+assign b = visible ? {px_colour[3], px_colour[2], px_colour[3] && px_colour[2], px_colour[3] && px_colour[2]} : 4'h0;
 
 // Character dot counter
 always @(posedge clk) begin
@@ -100,8 +115,6 @@ always @(posedge clk) begin
 end
 
 // CPU read/write
-reg write_reg;
-reg [1:0] mode_reg;
 always @(posedge clk) begin
   if(reset) begin
     vram_write_request <= 1'b0;
@@ -124,6 +137,8 @@ always @(posedge clk) begin
     v_sync_polarity <= 0;
     v_front_porch_lines <= 0;
     v_sync_chars <= 0;
+
+    h_chars <= 8'd40;
 
     write_reg <= 0;
     mode_reg <= 0;
@@ -155,6 +170,7 @@ always @(posedge clk) begin
             14: name_table_base[15:8] <= data_in;
             15: attr_table_base[7:0] <= data_in;
             16: attr_table_base[15:8] <= data_in;
+            17: h_chars <= data_in;
           endcase
         end
 
@@ -179,14 +195,6 @@ always @(posedge clk) begin
     mode_reg <= mode;
   end
 end
-
-reg [15:0] vram_offset;
-reg [15:0] vram_base;
-wire [7:0] vram_data_out;
-reg [7:0] vram_data;
-
-reg [1:0] mem_state;
-reg vram_write_enable;
 
 always @(posedge dot_clk) if (reset) begin
   mem_state <= 0;
@@ -233,21 +241,6 @@ spram32k8 vram(
   .data_in(vram_data_to_write),
   .data_out(vram_data_out)
 );
-
-/*
-always @(posedge clk) begin
-  if(reset) begin
-    vram_data_read <= 0;
-    vram_data <= 0;
-  end else begin
-    if(cpu_has_vram) begin
-      vram_data <= vram_data_out;
-    end else begin
-      vram_data_read <= vram_data_out;
-    end
-  end
-end
-*/
 
 reg vram_we_reg;
 always @(posedge clk) begin
@@ -315,7 +308,7 @@ always @(posedge char_clk) begin
       h_ctr <= 0;
 
       if(char_row == 4'hf) begin
-        start_char_addr <= v_visible ? (start_char_addr + 16'd80) : 0;
+        start_char_addr <= v_visible ? (start_char_addr + {8'h00, h_chars}) : 0;
       end
 
       if(v_visible && (v_ctr == {v_display_chars, 3'b111})) begin

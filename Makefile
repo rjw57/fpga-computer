@@ -4,6 +4,8 @@ DEVICE = up5k
 
 ARACHNE = arachne-pnr
 ARACHNE_ARGS =
+NEXTPNR = nextpnr-ice40
+NEXTPNR_ARGS = --$(DEVICE)
 ICEPACK = icepack
 ICETIME = icetime
 ICEPROG = iceprog
@@ -15,7 +17,6 @@ SOURCES = \
 	$(CPU_SOURCES) \
 	bootrom.v \
 	bootrom.placeholder.hex \
-	bootrom.hex \
 	computer.v \
 	reset_timer.v \
 	spram32k8.v \
@@ -24,7 +25,7 @@ SOURCES = \
 
 HW_EXTRA_SOURCES = hw/pll.v hw/led.v
 
-SIM_EXTRA_SOURCES = sim/pll.v sim/led.v
+SIM_EXTRA_SOURCES = sim/pll.v sim/led.v bootrom.hex
 
 all: $(PROJ).bin
 
@@ -48,8 +49,15 @@ bootrom.placeholder.hex:
 %.blif: $(SOURCES) $(HW_EXTRA_SOURCES)
 	yosys -f 'verilog -sv' -p 'synth_ice40 -top top -blif $@' $(filter %.v, $^)
 
-%.tmp.asc: $(PIN_DEF) %.blif
-	$(ARACHNE) $(ARACHNE_ARGS) -d $(subst up,,$(subst hx,,$(subst lp,,$(DEVICE)))) -o $@ -p $^
+%.json: $(SOURCES) $(HW_EXTRA_SOURCES)
+	yosys -f 'verilog -sv' -p 'synth_ice40 -top top -json $@' $(filter %.v, $^)
+
+%.tmp.asc: %.json $(PIN_DEF)
+	$(NEXTPNR) $(NEXTPNR_ARGS) --asc $@ --pcf $(PIN_DEF) --json $<
+
+nextpnr-gui: %.json $(PIN_DEF)
+	$(NEXTPNR) $(NEXTPNR_ARGS) --asc $@ --pcf $(PIN_DEF) --json $< --gui
+.PHONY: nextpnr-gui
 
 %.asc: %.tmp.asc bootrom.hex
 	icebram bootrom.placeholder.hex bootrom.hex <"$<" >"$@"
