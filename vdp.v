@@ -90,9 +90,9 @@ assign b = visible ? char_addr[3:0] : 4'h0;
 
 wire [3:0]  px_colour;
 
-assign r = visible ? {px_colour[3] ? px_colour[0] : 0, px_colour[0], px_colour[0], px_colour[0]} : 4'h0;
-assign g = visible ? {px_colour[3] ? px_colour[1] : 0, px_colour[1], px_colour[1], px_colour[1]} : 4'h0;
-assign b = visible ? {px_colour[3] ? px_colour[2] : 0, px_colour[2], px_colour[2], px_colour[2]} : 4'h0;
+assign r = visible ? {px_colour[3] ? px_colour[0] : 1'b0, px_colour[0], px_colour[0], px_colour[0]} : 4'h0;
+assign g = visible ? {px_colour[3] ? px_colour[1] : 1'b0, px_colour[1], px_colour[1], px_colour[1]} : 4'h0;
+assign b = visible ? {px_colour[3] ? px_colour[2] : 1'b0, px_colour[2], px_colour[2], px_colour[2]} : 4'h0;
 
 // Character dot counter
 always @(posedge clk) begin

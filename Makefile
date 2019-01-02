@@ -15,6 +15,7 @@ SOURCES = \
 	$(CPU_SOURCES) \
 	bootrom.v \
 	bootrom.placeholder.hex \
+	bootrom.hex \
 	computer.v \
 	reset_timer.v \
 	spram32k8.v \
@@ -29,7 +30,7 @@ all: $(PROJ).bin
 
 .PHONY: all
 
-sim: example_tb.vcd
+sim: example_tb.vcd vdp_tb.vcd
 
 .PHONY: sim
 
